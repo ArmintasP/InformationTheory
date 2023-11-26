@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34316.72
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CompressionAlgorithms", "CompressionAlgorithms\CompressionAlgorithms.csproj", "{7C0FE7DC-FF54-41B1-9C52-34A102810AB5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{7EC56F1A-69A6-46C7-BCF4-32462B822121}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7C0FE7DC-FF54-41B1-9C52-34A102810AB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C0FE7DC-FF54-41B1-9C52-34A102810AB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C0FE7DC-FF54-41B1-9C52-34A102810AB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C0FE7DC-FF54-41B1-9C52-34A102810AB5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7EC56F1A-69A6-46C7-BCF4-32462B822121}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EC56F1A-69A6-46C7-BCF4-32462B822121}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EC56F1A-69A6-46C7-BCF4-32462B822121}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EC56F1A-69A6-46C7-BCF4-32462B822121}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3FC56A30-6F79-4D2C-8375-2AF3360DB01B}
+	EndGlobalSection
+EndGlobal
