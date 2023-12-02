@@ -1,4 +1,5 @@
 ﻿
+using CompressionAlgorithms.BitStream;
 using System.Text;
 
 namespace CompressionAlgorithms.ShannonFano;
@@ -8,10 +9,10 @@ public static class ShannonFanoDecoder
     public static async Task DecodeAsync(string filePath, string outputFilePath)
     {
         await using var fileReader = new FileStream(filePath, FileMode.Open);
-        await using var bitReader = new BitStream(fileReader);
+        await using var bitReader = new BitReader(fileReader);
         
         await using var fileWriter = new FileStream(outputFilePath, FileMode.Create);
-        await using var bitWriter = new BitStream(fileWriter);
+        await using var bitWriter = new BitWriter(fileWriter);
 
         var (wordLength, bitsAddedToFormLastByte, bitsAddedToLastWord) = ShannonFanoUtils.ParseHeader(bitReader);
         bitReader.IgnoreNLastBitsWhenEOF(bitsAddedToFormLastByte);

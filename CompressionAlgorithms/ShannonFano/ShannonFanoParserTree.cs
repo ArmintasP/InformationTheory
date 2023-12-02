@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using CompressionAlgorithms.BitStream;
+using System.Text;
 
 namespace CompressionAlgorithms.ShannonFano;
 
@@ -19,7 +20,7 @@ public sealed class ShannonFanoParserTree
         ConstructTree(header, wordLength);
     }
 
-    public ShannonFanoParserTree(BitStream stream, int wordLength)
+    public ShannonFanoParserTree(BitReader stream, int wordLength)
     {
         ConstructTree(stream, wordLength);
     }

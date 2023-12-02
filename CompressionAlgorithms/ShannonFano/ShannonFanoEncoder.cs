@@ -1,4 +1,6 @@
-﻿namespace CompressionAlgorithms.ShannonFano;
+﻿using CompressionAlgorithms.BitStream;
+
+namespace CompressionAlgorithms.ShannonFano;
 
 public static class ShannonFanoEncoder
 {
@@ -12,10 +14,10 @@ public static class ShannonFanoEncoder
         var tree = new ShannonFanoParserTree(codes);
         
         using var fileReader = new FileStream(filePath, FileMode.Open);
-        using var bitReader = new BitStream(fileReader);
+        using var bitReader = new BitReader(fileReader);
 
         using var fileWriter = new FileStream(outputFilePath, FileMode.Create);
-        using var bitWriter = new BitStream(fileWriter);
+        using var bitWriter = new BitWriter(fileWriter);
 
         var amountOfBitsFromLastWord = wordLength > bitReader.Length
             ? (int)bitReader.Length
@@ -48,7 +50,7 @@ public static class ShannonFanoEncoder
         OverwriteHeader(header, bitsAddedToFormLastByte, bitWriter);
     }
     
-    private static void OverwriteHeader(string header, int bitsAddedToFormLastByte, BitStream bitWriter)
+    private static void OverwriteHeader(string header, int bitsAddedToFormLastByte, BitWriter bitWriter)
     {
         var bitsAddedToFormLastByteAsBinaryString = bitsAddedToFormLastByte.ToBase2(padding: 3);
         
@@ -64,7 +66,7 @@ public static class ShannonFanoEncoder
         var frequencies = new Dictionary<string, int>();
 
         using var fileReader = new FileStream(filePath, FileMode.Open);
-        using var bitReader = new BitStream(fileReader);
+        using var bitReader = new BitReader(fileReader);
 
         var amountOfBitsFromLastWord = wordLength > bitReader.Length
             ? (int)bitReader.Length
