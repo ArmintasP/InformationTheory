@@ -7,9 +7,10 @@ namespace Tests;
 public class UtilsTests
 {
     [Theory]
-    [InlineData(5, "00101")]
-    [InlineData(1, "1")]
-    [InlineData(100, "0000001100100")]
+    [InlineData(4, "00101")]
+    [InlineData(0, "1")]
+    [InlineData(1, "010")]
+    [InlineData(99, "0000001100100")]
     public void Encode_number_in_Elias_gamma_code(int number, string expectedEncodedText)
     {
         // Act
@@ -20,10 +21,11 @@ public class UtilsTests
     }
 
     [Theory]
-    [InlineData("00101", 5)]
-    [InlineData("1", 1)]
-    [InlineData("0000001100100", 100)]
-    [InlineData("00101someothertext", 5)]
+    [InlineData("00101", 4)]
+    [InlineData("1", 0)]
+    [InlineData("010", 1)]
+    [InlineData("0000001100100", 99)]
+    [InlineData("00101someothertext", 4)]
     public void Decode_number_from_Elias_gamma_code(string streamText, int expectedDecodedNumber)
     {
         // Assign

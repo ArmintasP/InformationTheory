@@ -1,4 +1,5 @@
 using CompressionAlgorithms;
+using CompressionAlgorithms.BitStream;
 using FluentAssertions;
 using System.Collections;
 using System.Text;
@@ -18,7 +19,7 @@ public class BitStreamTests
         var bits = new byte[bytes.Length * 8];
 
         await using var memoryStream = new MemoryStream(bytes);
-        await using var bitStream = new BitStream(memoryStream, bufferSize);
+        await using var bitStream = new BitReader(memoryStream, bufferSize);
 
         // Act
         await bitStream.ReadExactlyAsync(bits, offset: 0, bits.Length);
@@ -46,7 +47,7 @@ public class BitStreamTests
             bits[i] = bitArray[i] ? (byte)'1' : (byte)'0';
 
         await using var memoryStream = new MemoryStream(capacity: bytes.Length);
-        await using var bitStream = new BitStream(memoryStream, bufferSize);
+        await using var bitStream = new BitWriter(memoryStream, bufferSize);
 
         // Act
         await bitStream.WriteAsync(bits);
@@ -75,7 +76,7 @@ public class BitStreamTests
         var bits = Encoding.ASCII.GetBytes(word);
 
         await using var memoryStream = new MemoryStream(capacity: 1);
-        await using var bitStream = new BitStream(memoryStream, bufferSize);
+        await using var bitStream = new BitWriter(memoryStream, bufferSize);
 
         // Act
         await bitStream.WriteAsync(bits);
