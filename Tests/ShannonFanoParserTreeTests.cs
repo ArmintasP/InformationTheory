@@ -17,7 +17,7 @@ public class ShannonFanoParserTreeTests
         };
 
         var codes = ShannonFanoUtils.ConstructCodes(frequencies);
-        var tree = new ShannonFanoParserTree(codes);
+        var tree = new ShannonFanoParserNode(codes);
 
         // Act
         var header = tree.ConstructTreeHeader();
@@ -33,7 +33,7 @@ public class ShannonFanoParserTreeTests
         var expectedHeader = new byte[] { 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0 };
         var stream = new MemoryStream(expectedHeader);
 
-        var tree = new ShannonFanoParserTree(stream, wordLength: 2);
+        var tree = new ShannonFanoParserNode(stream, wordLength: 2);
 
         // Act
         var header = tree.ConstructTreeHeader();

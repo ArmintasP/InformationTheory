@@ -4,72 +4,81 @@ namespace CompressionAlgorithms.ShannonFano;
 
 public static class ShannonFanoEncoder
 {
-    public static void Encode(string filePath, string outputFilePath, int wordLength)
+    // BufferSize should be at least 4096 bytes.
+    private const int BufferSizeMultiplier = 4096;
+
+    public static async Task EncodeAsync(string filePath, string outputFilePath, int wordLength)
     {
-        var bufferSize = 4096 * wordLength;
+        await using var fileReader = new FileStream(filePath, FileMode.Open);
+        await using var bitReader = new BitReader(fileReader);
+
+        await using var fileWriter = new FileStream(outputFilePath, FileMode.Create);
+        await using var bitWriter = new BitWriter(fileWriter);
+
+        var bufferSize = BufferSizeMultiplier * wordLength;
         byte[] buffer = new byte[bufferSize];
 
-        var frequencies = GetFrequencies(filePath, buffer, wordLength);
-        var codes = ShannonFanoUtils.ConstructCodes(frequencies);
-        var tree = new ShannonFanoParserTree(codes);
+        var metadata = await GetMetadataAsync(bitReader, buffer, wordLength);
 
-        using var fileReader = new FileStream(filePath, FileMode.Open);
-        using var bitReader = new BitReader(fileReader);
-
-        using var fileWriter = new FileStream(outputFilePath, FileMode.Create);
-        using var bitWriter = new BitWriter(fileWriter);
-
-        var bitsAddedToLastWordCount = GetBitsAddedToLastWordCount(wordLength, bitReader.Length);
-
-        // For now, we set bitsToCutBeforeDecoding to 0. Only later will we find that out and change this number.
-        var header = ShannonFanoUtils.ConstructHeader(wordLength, bitsAddedToLastWordCount, tree, bitsAddedToFormLastByte: 0);
+        var header = ConstructHeader(metadata);
         bitWriter.Write(header);
 
         int readBitsCount;
 
-        while ((readBitsCount = bitReader.ReadAtLeast(buffer, minimumBytes: buffer.Length, throwOnEndOfStream: false)) > 0)
+        while ((readBitsCount = await bitReader.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false)) > 0)
         {
             var bitCount = readBitsCount >= buffer.Length
                 ? readBitsCount
-                : readBitsCount + bitsAddedToLastWordCount;
+                : readBitsCount + metadata.BitsAddedToLastWordCount;
 
-            var text = buffer[.. bitCount];
-            var encodedText = ShannonFanoUtils.Encode(text, codes);
+            var text = buffer[..bitCount];
+            var encodedText = Encode(text, metadata.Codes);
 
             bitWriter.Write(encodedText);
         }
 
-        var bitsAddedToFormLastByte = bitWriter.FillRemainingBitsToFormAByte();
-        OverwriteHeader(header, bitsAddedToFormLastByte, bitWriter);
+        var bitsAddedToFormLastByteCount = bitWriter.FillRemainingBitsToFormAByte();
+        await OverwriteHeaderAsync(header, bitsAddedToFormLastByteCount, bitWriter);
     }
 
-    private static void OverwriteHeader(byte[] header, int bitsAddedToFormLastByte, BitWriter bitWriter)
+    private static async Task<ShannonFanoMetadata> GetMetadataAsync(BitReader bitReader, byte[] buffer, int wordLength)
     {
-        var bitsAddedToFormLastByteInBinary = bitsAddedToFormLastByte.ToBase2(padding: 3);
+        var frequencies = await GetFrequenciesAsync(bitReader, buffer, wordLength);
+        var codes = ShannonFanoUtils.ConstructCodes(frequencies);
+
+        return new ShannonFanoMetadata
+        {
+            WordLength = wordLength,
+            Codes = codes,
+            ParserTree = new ShannonFanoParserNode(codes),
+            BitsAddedToLastWordCount = GetBitsAddedToLastWordCount(wordLength, bitReader.Length)
+        };
+    }
+
+    private static async Task OverwriteHeaderAsync(byte[] header, int bitsAddedToFormLastByteCount, BitWriter bitWriter)
+    {
+        var bitsAddedToFormLastByteInBinary = bitsAddedToFormLastByteCount.ToBase2(padding: 3);
 
         // Only 3 bits are needed for `bitsAddedToFormLastByteInBinary`.
         header[0] = bitsAddedToFormLastByteInBinary[0];
         header[1] = bitsAddedToFormLastByteInBinary[1];
         header[2] = bitsAddedToFormLastByteInBinary[2];
 
-        // Only first byte needs to be overriden.
+        // Only first byte needs to be overwritten.
         var firstHeaderByte = header[0..8];
 
         bitWriter.SeekToBeginning();
-        bitWriter.Write(firstHeaderByte);
+        await bitWriter.WriteAsync(firstHeaderByte);
     }
 
-    private static Dictionary<byte[], int> GetFrequencies(string filePath, Span<byte> buffer, int wordLength)
+    private static async Task<Dictionary<byte[], int>> GetFrequenciesAsync(BitReader bitReader, byte[] buffer, int wordLength)
     {
         var frequencies = new Dictionary<byte[], int>(new ShannonFanoUtils.ByteArrayEqualityComprarer());
-
-        using var fileReader = new FileStream(filePath, FileMode.Open);
-        using var bitReader = new BitReader(fileReader);
 
         var bitsAddedToLastWordCount = GetBitsAddedToLastWordCount(wordLength, bitReader.Length);
         int readBitsCount;
 
-        while ((readBitsCount = bitReader.ReadAtLeast(buffer, minimumBytes: buffer.Length, throwOnEndOfStream: false)) > 0)
+        while ((readBitsCount = await bitReader.ReadAtLeastAsync(buffer, minimumBytes: buffer.Length, throwOnEndOfStream: false)) > 0)
         {
             // This means this is the end of a file and the last word is not complete. So we add some fictive bits.
             var bitCount = readBitsCount >= buffer.Length
@@ -78,6 +87,8 @@ public static class ShannonFanoEncoder
 
             buffer[..bitCount].CalculateFrequencies(wordLength, frequencies);
         }
+
+        bitReader.SeekToBeginning();
 
         return frequencies;
     }
@@ -93,5 +104,33 @@ public static class ShannonFanoEncoder
             : 0;
 
         return bitsAddedToLastWordCount;
+    }
+
+    private static byte[] Encode(byte[] text, Dictionary<byte[], byte[]> codes)
+    {
+        var encodedText = new List<byte>();
+        var wordLength = codes.First().Key.Length;
+
+        for (var i = 0; i < text.Length; i += wordLength)
+        {
+            var word = text[i..(i + wordLength)];
+            encodedText.AddRange(codes[word]);
+        }
+
+        return [.. encodedText];
+    }
+
+    /// <summary>
+    /// bitsAddedToFormLastByte takes first 3 bits but cannot be known before encoding is done. Do not forget to overwrite those first 3 bits.
+    /// </summary>
+    private static byte[] ConstructHeader(ShannonFanoMetadata metadata)
+    {
+        return
+        [
+            .. new byte[] { 0, 0, 0 },
+            .. metadata.BitsAddedToLastWordCount.EliasGammaCode(),
+            .. metadata.WordLength.EliasGammaCode(),
+            .. metadata.ParserTree.ConstructTreeHeader(),
+        ];
     }
 }

@@ -2,11 +2,11 @@
 
 public static class Utils
 {
-    public static void CalculateFrequencies(this Span<byte> text, int wordLength, Dictionary<byte[], int> frequencies)
+    public static void CalculateFrequencies(this byte[] text, int wordLength, Dictionary<byte[], int> frequencies)
     {
         for (var i = 0; i < text.Length; i += wordLength)
         {
-            var word = text[i..(i + wordLength)].ToArray();
+            var word = text[i..(i + wordLength)];
 
             frequencies[word] = frequencies.TryGetValue(word, out var frequency)
                 ? frequency + 1

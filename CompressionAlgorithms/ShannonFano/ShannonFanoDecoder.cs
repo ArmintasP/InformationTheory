@@ -1,6 +1,5 @@
-﻿
-using CompressionAlgorithms.BitStream;
-using System.Text;
+﻿using CompressionAlgorithms.BitStream;
+using System.IO;
 
 namespace CompressionAlgorithms.ShannonFano;
 
@@ -14,14 +13,13 @@ public static class ShannonFanoDecoder
         await using var fileWriter = new FileStream(outputFilePath, FileMode.Create);
         await using var bitWriter = new BitWriter(fileWriter);
 
-        var (wordLength, bitsAddedToFormLastByte, bitsAddedToLastWord) = ShannonFanoUtils.ParseHeader(bitReader);
-        bitReader.IgnoreNLastBitsWhenEOF(bitsAddedToFormLastByte);
+        var metadata = GetMetadata(bitReader);
 
-        var bufferSize = 1024 * wordLength;
+        bitReader.IgnoreNLastBitsWhenEOF(metadata.BitsAddedToFormLastByteCount);
+
+        var bufferSize = 1024 * metadata.WordLength;
         var buffer = new byte[bufferSize];
         var leftovers = Array.Empty<byte>();
-
-        var tree = new ShannonFanoParserTree(bitReader, wordLength);
 
         var decodedText = new List<byte>();
         int readBitsCount;
@@ -32,9 +30,9 @@ public static class ShannonFanoDecoder
             var index = 0;
             byte[]? decodedWord;
 
-            leftovers = leftovers.Concat(buffer[..readBitsCount]).ToArray();
+            leftovers = [.. leftovers, .. buffer[..readBitsCount]];
 
-            while ((decodedWord = tree.GetWord(leftovers, offset, ref index)) is not null)
+            while ((decodedWord = metadata.ParserTree.GetWord(leftovers, offset, ref index)) is not null)
             {
                 decodedText.AddRange(decodedWord);
                 offset += index;
@@ -43,13 +41,34 @@ public static class ShannonFanoDecoder
 
             if (bitReader.IsEOF())
             {
-                decodedText.RemoveRange(decodedText.Count - bitsAddedToLastWord, bitsAddedToLastWord);
+                decodedText.RemoveRange(decodedText.Count - metadata.BitsAddedToLastWordCount, metadata.BitsAddedToLastWordCount);
             }
 
             await bitWriter.WriteAsync(decodedText.ToArray());
             decodedText.Clear();
-            
+
             leftovers = leftovers[offset..];
         }
+    }
+
+    private static ShannonFanoMetadata GetMetadata(BitReader bitReader)
+    {
+        var buffer = new byte[3];
+        bitReader.ReadExactly(buffer);
+        var bitsAddedToFormLastByteCount = buffer.ToInt32();
+
+        var bitsAddedToLastWordCount = Utils.DecodeEliasGammaCode(bitReader);
+        var wordLength = Utils.DecodeEliasGammaCode(bitReader);
+
+        var tree = new ShannonFanoParserNode(bitReader, wordLength);
+
+        return new ShannonFanoMetadata
+        {
+            WordLength = wordLength,
+            BitsAddedToLastWordCount = bitsAddedToLastWordCount,
+            BitsAddedToFormLastByteCount = bitsAddedToFormLastByteCount,
+            ParserTree = tree,
+            Codes = [],
+        };
     }
 }

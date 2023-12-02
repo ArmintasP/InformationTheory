@@ -94,6 +94,13 @@ public sealed class BitReader : Stream
         return _readBitBufferPosition >= _readBitBufferFilledLength;
     }
 
+    public long SeekToBeginning()
+    {
+        _readBitBufferPosition = 0;
+        _readBitBufferFilledLength = 0;
+        return _stream.Seek(0, SeekOrigin.Begin);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
