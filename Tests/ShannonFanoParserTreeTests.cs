@@ -30,13 +30,15 @@ public class ShannonFanoParserTreeTests
     public void Create_tree_from_header()
     {
         // Assign
-        var initialHeader = new byte[] { 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0 };
-        var tree = new ShannonFanoParserTree(initialHeader, wordLength: 2);
+        var expectedHeader = new byte[] { 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0 };
+        var stream = new MemoryStream(expectedHeader);
+
+        var tree = new ShannonFanoParserTree(stream, wordLength: 2);
 
         // Act
         var header = tree.ConstructTreeHeader();
         
         // Assert
-        header.Should().Equal(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0);
+        header.Should().Equal(header);
     }
 }

@@ -13,13 +13,8 @@ public sealed class ShannonFanoParserTree
     {
         ConstructTree(codes);
     }
-
-    public ShannonFanoParserTree(byte[] header, int wordLength)
-    {
-        ConstructTree(header, wordLength);
-    }
-
-    public ShannonFanoParserTree(BitReader stream, int wordLength)
+    
+    public ShannonFanoParserTree(Stream stream, int wordLength)
     {
         ConstructTree(stream, wordLength);
     }
@@ -28,21 +23,25 @@ public sealed class ShannonFanoParserTree
 
     public byte[]? GetWord(byte[] text, int offset, ref int index)
     {
-        if (_word != null)
-            return _word;
+        var currentNode = this;
+        
+        while (currentNode._word is null)
+        {
+            if (offset + index >= text.Length)
+                return null;
 
-        if (offset + index >= text.Length)
-            return null;
+            var bit = text[offset + index];
+            index++;
 
-        var bit = text[offset + index];
-        index++;
-
-        if (bit is 0)
-            return _left!.GetWord(text, offset, ref index);
-        if (bit is 1)
-            return _right!.GetWord(text, offset, ref index);
-        else
-            throw new InvalidDataException($"'{bit}' is not 0 or 1");
+            if (bit is 0)
+                currentNode = currentNode._left!;
+            else if (bit is 1)
+                currentNode = currentNode._right!;
+            else
+                throw new InvalidDataException($"'{bit}' is not 0 or 1");
+        }
+     
+        return currentNode._word;
     }
 
     private void ConstructTree(Dictionary<byte[], byte[]> codes)
@@ -68,33 +67,6 @@ public sealed class ShannonFanoParserTree
             }
             currentNode._word = word;
             currentNode = this;
-        }
-    }
-
-    private void ConstructTree(byte[] header, int wordLength)
-    {
-        var stack = new Stack<ShannonFanoParserTree>();
-        stack.Push(this);
-
-        for (var i = 0; stack.Count > 0; i++)
-        {
-            var currentNode = stack.Pop();
-
-            var bit = header[i];
-
-            if (bit is 1)
-            {
-                currentNode._word = header[(1 + i)..(1 + i + wordLength)];
-                i += wordLength;
-            }
-            else if (bit is 0)
-            {
-                currentNode._left = new ShannonFanoParserTree();
-                currentNode._right = new ShannonFanoParserTree();
-
-                stack.Push(currentNode._right);
-                stack.Push(currentNode._left);
-            }
         }
     }
 
@@ -128,8 +100,10 @@ public sealed class ShannonFanoParserTree
         // Means there is only one node, "0" -> someWord.
         if (_word is not null)
         {
-            _left = new ShannonFanoParserTree();
-            _left._word = _word;
+            _left = new ShannonFanoParserTree
+            {
+                _word = _word
+            };
 
             _word = null;
         }

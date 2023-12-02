@@ -1,5 +1,4 @@
 ﻿using CompressionAlgorithms.BitStream;
-using static CompressionAlgorithms.ShannonFano.ShannonFanoUtils;
 
 namespace CompressionAlgorithms.ShannonFano;
 
@@ -7,7 +6,7 @@ public static class ShannonFanoEncoder
 {
     public static void Encode(string filePath, string outputFilePath, int wordLength)
     {
-        var bufferSize = 1024 * wordLength;
+        var bufferSize = 4096 * wordLength;
         byte[] buffer = new byte[bufferSize];
 
         var frequencies = GetFrequencies(filePath, buffer, wordLength);
@@ -62,7 +61,7 @@ public static class ShannonFanoEncoder
 
     private static Dictionary<byte[], int> GetFrequencies(string filePath, Span<byte> buffer, int wordLength)
     {
-        var frequencies = new Dictionary<byte[], int>(new ByteArrayEqualityComprarer());
+        var frequencies = new Dictionary<byte[], int>(new ShannonFanoUtils.ByteArrayEqualityComprarer());
 
         using var fileReader = new FileStream(filePath, FileMode.Open);
         using var bitReader = new BitReader(fileReader);

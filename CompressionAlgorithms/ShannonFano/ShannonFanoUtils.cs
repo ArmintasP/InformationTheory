@@ -1,5 +1,8 @@
 ﻿using CompressionAlgorithms.BitStream;
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Hashing;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace CompressionAlgorithms.ShannonFano;
@@ -132,7 +135,7 @@ public static class ShannonFanoUtils
 
         public int GetHashCode([DisallowNull] byte[] obj)
         {
-            return Encoding.ASCII.GetString(obj).GetHashCode();
+            return unchecked((int)XxHash32.HashToUInt32(obj));
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿namespace CompressionAlgorithms.BitStream;
+
 public sealed class BitReader : Stream
 {
     private readonly Stream _stream;
@@ -9,7 +10,7 @@ public sealed class BitReader : Stream
     private readonly byte[] _readBitBuffer;
     private readonly byte[] _readByteBuffer;
 
-    public BitReader(Stream stream, int bitBufferSize = 8 * 1024 * 8)
+    public BitReader(Stream stream, int bitBufferSize = 4096 * 8)
     {
         _stream = stream;
 
@@ -34,8 +35,8 @@ public sealed class BitReader : Stream
             : _readBitBufferPosition + count;
 
         var numberOfReadBits = indexOfLastReadBit - _readBitBufferPosition;
+        Buffer.BlockCopy(_readBitBuffer, _readBitBufferPosition, buffer, offset, numberOfReadBits);
 
-        _readBitBuffer[_readBitBufferPosition..indexOfLastReadBit].CopyTo(buffer, offset);
         _readBitBufferPosition = indexOfLastReadBit;
 
         return numberOfReadBits;
