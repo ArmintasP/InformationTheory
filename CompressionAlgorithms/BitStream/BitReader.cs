@@ -1,7 +1,4 @@
 ﻿namespace CompressionAlgorithms.BitStream;
-
-using System.Collections;
-
 public sealed class BitReader : Stream
 {
     private readonly Stream _stream;
@@ -19,7 +16,7 @@ public sealed class BitReader : Stream
         _readBitBuffer = new byte[bitBufferSize];
         _readByteBuffer = new byte[bitBufferSize / 8];
     }
-    
+
     public override long Length => _stream.Length * 8;
 
     public override bool CanRead => true;
@@ -47,15 +44,21 @@ public sealed class BitReader : Stream
     private void ReadToBitBuffer()
     {
         var bytesReadCount = _stream.Read(_readByteBuffer, 0, _readByteBuffer.Length);
-        var bitArray = new BitArray(_readByteBuffer[0..bytesReadCount]);
 
         _readBitBufferPosition = 0;
         _readBitBufferFilledLength = 0;
 
-        foreach (bool bit in bitArray)
+        foreach (var b in _readByteBuffer[0..bytesReadCount])
         {
-            _readBitBuffer[_readBitBufferFilledLength] = bit ? (byte)'1' : (byte)'0';
-            _readBitBufferFilledLength++;
+            _readBitBuffer[_readBitBufferFilledLength + 0] = (byte)((b & 0b10000000) >> 7);
+            _readBitBuffer[_readBitBufferFilledLength + 1] = (byte)((b & 0b01000000) >> 6);
+            _readBitBuffer[_readBitBufferFilledLength + 2] = (byte)((b & 0b00100000) >> 5);
+            _readBitBuffer[_readBitBufferFilledLength + 3] = (byte)((b & 0b00010000) >> 4);
+            _readBitBuffer[_readBitBufferFilledLength + 4] = (byte)((b & 0b00001000) >> 3);
+            _readBitBuffer[_readBitBufferFilledLength + 5] = (byte)((b & 0b00000100) >> 2);
+            _readBitBuffer[_readBitBufferFilledLength + 6] = (byte)((b & 0b00000010) >> 1);
+            _readBitBuffer[_readBitBufferFilledLength + 7] = (byte)((b & 0b00000001) >> 0);
+            _readBitBufferFilledLength += 8;
         }
 
         IgnoreNLastBitsWhenEOF();

@@ -1,5 +1,4 @@
 ﻿using CompressionAlgorithms.BitStream;
-using System.Text;
 
 namespace CompressionAlgorithms.ShannonFano;
 
@@ -8,14 +7,14 @@ public sealed class ShannonFanoParserTree
     private ShannonFanoParserTree? _left = null;
     private ShannonFanoParserTree? _right = null;
 
-    private string? _word;
+    private byte[]? _word;
 
-    public ShannonFanoParserTree(Dictionary<string, string> codes)
+    public ShannonFanoParserTree(Dictionary<byte[], byte[]> codes)
     {
         ConstructTree(codes);
     }
 
-    public ShannonFanoParserTree(string header, int wordLength)
+    public ShannonFanoParserTree(byte[] header, int wordLength)
     {
         ConstructTree(header, wordLength);
     }
@@ -27,7 +26,7 @@ public sealed class ShannonFanoParserTree
 
     private ShannonFanoParserTree() { }
 
-    public string? GetWord(byte[] text, int offset, ref int index)
+    public byte[]? GetWord(byte[] text, int offset, ref int index)
     {
         if (_word != null)
             return _word;
@@ -38,15 +37,15 @@ public sealed class ShannonFanoParserTree
         var bit = text[offset + index];
         index++;
 
-        if (bit is (byte)'0')
+        if (bit is 0)
             return _left!.GetWord(text, offset, ref index);
-        if (bit is (byte)'1')
+        if (bit is 1)
             return _right!.GetWord(text, offset, ref index);
         else
             throw new InvalidDataException($"'{bit}' is not 0 or 1");
     }
 
-    private void ConstructTree(Dictionary<string, string> codes)
+    private void ConstructTree(Dictionary<byte[], byte[]> codes)
     {
         var currentNode = this;
 
@@ -54,12 +53,12 @@ public sealed class ShannonFanoParserTree
         {
             foreach (var bit in code)
             {
-                if (bit is '0')
+                if (bit is 0)
                 {
                     currentNode._left = currentNode._left is null ? new ShannonFanoParserTree() : currentNode._left;
                     currentNode = currentNode._left;
                 }
-                else if (bit is '1')
+                else if (bit is 1)
                 {
                     currentNode._right = currentNode._right is null ? new ShannonFanoParserTree() : currentNode._right;
                     currentNode = currentNode._right;
@@ -72,7 +71,7 @@ public sealed class ShannonFanoParserTree
         }
     }
 
-    private void ConstructTree(string header, int wordLength)
+    private void ConstructTree(byte[] header, int wordLength)
     {
         var stack = new Stack<ShannonFanoParserTree>();
         stack.Push(this);
@@ -83,12 +82,12 @@ public sealed class ShannonFanoParserTree
 
             var bit = header[i];
 
-            if (bit is '1')
+            if (bit is 1)
             {
                 currentNode._word = header[(1 + i)..(1 + i + wordLength)];
                 i += wordLength;
             }
-            else if (bit is '0')
+            else if (bit is 0)
             {
                 currentNode._left = new ShannonFanoParserTree();
                 currentNode._right = new ShannonFanoParserTree();
@@ -101,8 +100,6 @@ public sealed class ShannonFanoParserTree
 
     private void ConstructTree(Stream stream, int wordLength)
     {
-        var buffer = new byte[wordLength];
-        
         var stack = new Stack<ShannonFanoParserTree>();
         stack.Push(this);
 
@@ -110,14 +107,15 @@ public sealed class ShannonFanoParserTree
         {
             var currentNode = stack.Pop();
 
-            var bit = (char)stream.ReadByte(); 
+            var bit = stream.ReadByte();
 
-            if (bit is '1')
+            if (bit is 1)
             {
+                var buffer = new byte[wordLength];
                 stream.ReadExactly(buffer);
-                currentNode._word = buffer.ToString2();
+                currentNode._word = buffer;
             }
-            else if (bit is '0')
+            else if (bit is 0)
             {
                 currentNode._left = new ShannonFanoParserTree();
                 currentNode._right = new ShannonFanoParserTree();
@@ -137,9 +135,9 @@ public sealed class ShannonFanoParserTree
         }
     }
 
-    public string ConstructTreeHeader()
+    public byte[] ConstructTreeHeader()
     {
-        var header = new StringBuilder();
+        var header = new List<byte>();
         var startingNode = this;
 
         if (_word is null && _right is null && _left is not null)
@@ -148,12 +146,17 @@ public sealed class ShannonFanoParserTree
         DepthFirstSearch(startingNode, node =>
         {
             if (node._word is not null)
-                header.Append('1').Append(node._word);
+            {
+                header.Add(1);
+                header.AddRange(node._word);
+            }
             else
-                header.Append('0');
+            {
+                header.Add(0);
+            }
         });
 
-        return header.ToString();
+        return header.ToArray();
     }
 
     private static void DepthFirstSearch(ShannonFanoParserTree node, Action<ShannonFanoParserTree> callBack)

@@ -9,11 +9,11 @@ public class ShannonFanoParserTreeTests
     public void Construct_header()
     {
         // Assign
-        var frequencies = new Dictionary<string, int>()
+        var frequencies = new Dictionary<byte[], int>()
         {
-            ["b"] = 5,
-            ["a"] = 11,
-            ["c"] = 2,
+            [[0, 1, 1, 0, 0, 0, 1, 0]] = 5,
+            [[0, 1, 1, 0, 0, 0, 0, 1]] = 11,
+            [[0, 1, 1, 0, 0, 0, 1, 1]] = 2,
         };
 
         var codes = ShannonFanoUtils.ConstructCodes(frequencies);
@@ -23,20 +23,20 @@ public class ShannonFanoParserTreeTests
         var header = tree.ConstructTreeHeader();
 
         // Assert
-        header.Should().Be("01a01b1c");
+        header.Should().Equal(0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1);
     }
 
     [Fact]
     public void Create_tree_from_header()
     {
         // Assign
-        var initialHeader = "001b1c1a";
-        var tree = new ShannonFanoParserTree(initialHeader, wordLength: 1);
+        var initialHeader = new byte[] { 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0 };
+        var tree = new ShannonFanoParserTree(initialHeader, wordLength: 2);
 
         // Act
         var header = tree.ConstructTreeHeader();
-
+        
         // Assert
-        header.Should().Be("001b1c1a");
+        header.Should().Equal(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0);
     }
 }

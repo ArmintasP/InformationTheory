@@ -8,18 +8,18 @@ public sealed class BitWriter : Stream
 
     private readonly Stream _stream;
 
-    private readonly bool[] _writeBoolBuffer;
+    private readonly byte[] _writeBitsBuffer;
     private readonly byte[] _writeByteBuffer;
-    private int _writeBoolBufferPosition = 0;
+    private int _writeBitsBufferPosition = 0;
 
     public BitWriter(Stream stream, int bitBufferSize = 8 * 1024 * 16)
     {
         _stream = stream;
 
-        _writeBoolBuffer = new bool[bitBufferSize];
+        _writeBitsBuffer = new byte[bitBufferSize];
         _writeByteBuffer = new byte[bitBufferSize / 8];
     }
-    
+
     public override bool CanWrite => true;
 
     /// <summary>
@@ -27,25 +27,21 @@ public sealed class BitWriter : Stream
     /// </summary>
     public override void Write(byte[] buffer, int offset, int count)
     {
-        var bitsAsBools = buffer
-            .Skip(offset)
-            .Take(count)
-            .Select(bit => bit == (byte)'1')
-            .ToArray();
+        var bits = buffer[offset..(offset + count)];
 
-        while (bitsAsBools.Length - (_writeBoolBuffer.Length - _writeBoolBufferPosition) > 0)
+        while (bits.Length - (_writeBitsBuffer.Length - _writeBitsBufferPosition) > 0)
         {
-            var remainingSpaceInWriteBuffer = _writeBoolBuffer.Length - _writeBoolBufferPosition;
+            var remainingSpaceInWriteBuffer = _writeBitsBuffer.Length - _writeBitsBufferPosition;
 
-            bitsAsBools[0..remainingSpaceInWriteBuffer].CopyTo(_writeBoolBuffer, _writeBoolBufferPosition);
-            bitsAsBools = bitsAsBools[remainingSpaceInWriteBuffer..];
+            bits[0..remainingSpaceInWriteBuffer].CopyTo(_writeBitsBuffer, _writeBitsBufferPosition);
+            bits = bits[remainingSpaceInWriteBuffer..];
 
-            _writeBoolBufferPosition += remainingSpaceInWriteBuffer;
+            _writeBitsBufferPosition += remainingSpaceInWriteBuffer;
             WriteToUnderlyingStream();
         }
 
-        bitsAsBools.CopyTo(_writeBoolBuffer, _writeBoolBufferPosition);
-        _writeBoolBufferPosition += bitsAsBools.Length;
+        bits.CopyTo(_writeBitsBuffer, _writeBitsBufferPosition);
+        _writeBitsBufferPosition += bits.Length;
     }
 
     /// <summary>
@@ -54,7 +50,7 @@ public sealed class BitWriter : Stream
     /// </summary>
     public int FillRemainingBitsToFormAByte()
     {
-        var filledBitsCount = _writeBoolBufferPosition % 8;
+        var filledBitsCount = _writeBitsBufferPosition % 8;
         if (filledBitsCount is 0)
             return 0;
 
@@ -66,14 +62,28 @@ public sealed class BitWriter : Stream
 
     private void WriteToUnderlyingStream()
     {
-        if (_writeBoolBufferPosition % 8 != 0)
+        if (_writeBitsBufferPosition % 8 != 0)
             throw new InvalidOperationException("Amount of bits written should be divisible by 8.");
 
-        var valuesToWrite = _writeBoolBuffer[0.._writeBoolBufferPosition];
-        new BitArray(valuesToWrite).CopyTo(_writeByteBuffer, 0);
+        var bitsToWrite = _writeBitsBuffer[0.._writeBitsBufferPosition];
 
-        _stream.Write(_writeByteBuffer, 0, _writeBoolBufferPosition / 8);
-        _writeBoolBufferPosition = 0;
+        for (var i = 0; i < bitsToWrite.Length / 8; i++)
+        {
+            _writeByteBuffer[i] = (byte)
+                (
+                    bitsToWrite[i * 8 + 0] << 7 |
+                    bitsToWrite[i * 8 + 1] << 6 |
+                    bitsToWrite[i * 8 + 2] << 5 |
+                    bitsToWrite[i * 8 + 3] << 4 |
+                    bitsToWrite[i * 8 + 4] << 3 |
+                    bitsToWrite[i * 8 + 5] << 2 |
+                    bitsToWrite[i * 8 + 6] << 1 |
+                    bitsToWrite[i * 8 + 7] << 0
+                );
+        }
+
+        _stream.Write(_writeByteBuffer, 0, bitsToWrite.Length / 8);
+        _writeBitsBufferPosition = 0;
     }
 
     public override void Flush()
@@ -94,7 +104,7 @@ public sealed class BitWriter : Stream
         if (disposing)
             _stream.Dispose();
     }
-    
+
     public override bool CanRead => throw new NotImplementedException();
 
     public override bool CanSeek => throw new NotImplementedException();
@@ -102,7 +112,7 @@ public sealed class BitWriter : Stream
     public override long Length => throw new NotImplementedException();
 
     public override long Position { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    
+
     public override int Read(byte[] buffer, int offset, int count)
     {
         throw new NotImplementedException();

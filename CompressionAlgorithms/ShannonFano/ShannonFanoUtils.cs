@@ -1,17 +1,19 @@
-﻿using System.Text;
+﻿using CompressionAlgorithms.BitStream;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 namespace CompressionAlgorithms.ShannonFano;
 
 public static class ShannonFanoUtils
 {
-    public static (int wordLength, int bitsAddedToFormLastByte, int bitsAddedToLastWord) ParseHeader(Stream stream)
+    public static (int wordLength, int bitsAddedToFormLastByte, int bitsAddedToLastWord) ParseHeader(BitReader bitReader)
     {
         var buffer = new byte[3];
-        stream.ReadExactly(buffer);
-        var bitsAddedToFormLastByte = buffer.ToString2().ToInt32();
+        bitReader.ReadExactly(buffer);
+        var bitsAddedToFormLastByte = buffer.ToInt32();
 
-        var bitsAddedToLastWord = Utils.DecodeEliasGammaCode(stream);
-        var wordLength = Utils.DecodeEliasGammaCode(stream);
+        var bitsAddedToLastWord = Utils.DecodeEliasGammaCode(bitReader);
+        var wordLength = Utils.DecodeEliasGammaCode(bitReader);
 
         return (wordLength, bitsAddedToFormLastByte, bitsAddedToLastWord);
     }
@@ -19,48 +21,55 @@ public static class ShannonFanoUtils
     /// <summary>
     /// bitsToCutBeforeDecoding takes first 3 bits. Do not forget to update it.
     /// </summary>
-    public static string ConstructHeader(int wordLength, int bitsAddedToLastWord, ShannonFanoParserTree tree, int bitsAddedToFormLastByte = 0)
+    public static byte[] ConstructHeader(int wordLength, int bitsAddedToLastWord, ShannonFanoParserTree tree, int bitsAddedToFormLastByte = 0)
     {
-        return bitsAddedToFormLastByte.ToBase2(padding: 3) +
-            bitsAddedToLastWord.EliasGammaCode() +
-            wordLength.EliasGammaCode() +
-            tree.ConstructTreeHeader();
+        return bitsAddedToFormLastByte.ToBase2(padding: 3)
+            .Concat(bitsAddedToLastWord.EliasGammaCode())
+            .Concat(wordLength.EliasGammaCode())
+            .Concat(tree.ConstructTreeHeader())
+            .ToArray();
     }
 
-    public static string Encode(string text, Dictionary<string, string> codes)
+    public static byte[] Encode(byte[] text, Dictionary<byte[], byte[]> codes)
     {
-        var encodedText = new StringBuilder();
+        var encodedText = new List<byte>();
         var wordLength = codes.First().Key.Length;
 
         for (var i = 0; i < text.Length; i += wordLength)
         {
             var word = text[i..(i + wordLength)];
-            encodedText.Append(codes[word]);
+            encodedText.AddRange(codes[word]);
         }
 
-        return encodedText.ToString();
+        return encodedText.ToArray();
     }
 
-    public static Dictionary<string, string> ConstructCodes(Dictionary<string, int> frequencies)
+    public static Dictionary<byte[], byte[]> ConstructCodes(Dictionary<byte[], int> frequencies)
     {
+        var equalityComparer = new ByteArrayEqualityComprarer();
+
         if (frequencies.Count is 1)
         {
-            return new Dictionary<string, string>
+            return new Dictionary<byte[], byte[]>(new ByteArrayEqualityComprarer())
             {
-                [frequencies.First().Key] = "0"
+                [frequencies.First().Key] = [0]
             };
         }
 
         var sortedFrequencies = frequencies
             .OrderByDescending(x => x.Value)
             .ToDictionary(x => x.Key, x => x.Value);
-
-        var codes = new Dictionary<string, string>();
+        
+        var codes = new Dictionary<byte[], List<byte>>(equalityComparer);
         ConstructCodes(sortedFrequencies, sortedFrequencies.Keys.ToList(), codes);
-        return codes;
+
+        return codes.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value.ToArray(),
+            equalityComparer);
     }
 
-    private static void ConstructCodes(Dictionary<string, int> sortedFrequencies, List<string> words, Dictionary<string, string> codes)
+    private static void ConstructCodes(Dictionary<byte[], int> sortedFrequencies, List<byte[]> words, Dictionary<byte[], List<byte>> codes)
     {
         if (words.Count is 1)
             return;
@@ -71,20 +80,30 @@ public static class ShannonFanoUtils
         var secondHalf = words[middleIndex..];
 
         foreach (var word in firstHalf)
-            codes[word] = codes.TryGetValue(word, out var existingCode)
-                ? existingCode + "0"
-                : "0";
+        {
+            codes.TryGetValue(word, out var code);
+
+            if (code is null)
+                codes[word] = [];
+
+            codes[word].Add(0);
+        }
 
         foreach (var word in secondHalf)
-            codes[word] = codes.TryGetValue(word, out var existingCode)
-                ? existingCode + "1"
-                : "1";
+        {
+            codes.TryGetValue(word, out var code);
+
+            if (code is null)
+                codes[word] = [];
+
+            codes[word].Add(1);
+        }
 
         ConstructCodes(sortedFrequencies, firstHalf, codes);
         ConstructCodes(sortedFrequencies, secondHalf, codes);
     }
 
-    private static int FindMiddleIndex(List<string> words, Dictionary<string, int> sortedFrequencies)
+    private static int FindMiddleIndex(List<byte[]> words, Dictionary<byte[], int> sortedFrequencies)
     {
         var sum = words.Sum(word => sortedFrequencies[word]);
         var halfSum = sum / 2;
@@ -99,5 +118,21 @@ public static class ShannonFanoUtils
                 return i + 1;
         }
         return i + 1;
+    }
+    
+    public sealed class ByteArrayEqualityComprarer : IEqualityComparer<byte[]>
+    {
+        public bool Equals(byte[]? x, byte[]? y)
+        {
+            if (x is null || y is null)
+                return false;
+            
+            return x.SequenceEqual(y);
+        }
+
+        public int GetHashCode([DisallowNull] byte[] obj)
+        {
+            return Encoding.ASCII.GetString(obj).GetHashCode();
+        }
     }
 }

@@ -1,8 +1,5 @@
-using CompressionAlgorithms;
 using CompressionAlgorithms.BitStream;
 using FluentAssertions;
-using System.Collections;
-using System.Text;
 
 namespace Tests;
 
@@ -25,11 +22,14 @@ public class BitStreamTests
         await bitStream.ReadExactlyAsync(bits, offset: 0, bits.Length);
 
         // Assert
-        var bitsAsBools = bits.Select(b => b == (byte)'1').ToArray();
-        var bitsConvertedToBytes = new byte[bytes.Length];
-        new BitArray(bitsAsBools).CopyTo(bitsConvertedToBytes, 0);
-
-        bitsConvertedToBytes.Should().BeEquivalentTo(bytes);
+        bits.Should().Equal(
+            0, 0, 0, 0, 0, 1, 1, 0, // 6
+            0, 0, 0, 0, 0, 0, 0, 1, // 1
+            0, 0, 0, 0, 0, 1, 0, 0, // 4
+            0, 0, 0, 0, 0, 1, 0, 0, // 4
+            0, 0, 0, 0, 0, 0, 1, 1, // 3
+            0, 0, 0, 0, 0, 0, 1, 0  // 2
+        );
     }
 
     [Theory]
@@ -39,14 +39,17 @@ public class BitStreamTests
     public async Task Write_bytes(int bufferSize)
     {
         // Assign
-        var bytes = new byte[] { 6, 1, 4, 4, 3, 2 };
-        var bits = new byte[bytes.Length * 8];
+        var bits = new byte[]
+        {
+            0, 0, 0, 0, 0, 1, 1, 0, // 6
+            0, 0, 0, 0, 0, 0, 0, 1, // 1
+            0, 0, 0, 0, 0, 1, 0, 0, // 4
+            0, 0, 0, 0, 0, 1, 0, 0, // 4
+            0, 0, 0, 0, 0, 0, 1, 1, // 3
+            0, 0, 0, 0, 0, 0, 1, 0  // 2
+        };
 
-        var bitArray = new BitArray(bytes);
-        for (var i = 0; i < bitArray.Length; i++)
-            bits[i] = bitArray[i] ? (byte)'1' : (byte)'0';
-
-        await using var memoryStream = new MemoryStream(capacity: bytes.Length);
+        await using var memoryStream = new MemoryStream(capacity: bits.Length / 8);
         await using var bitStream = new BitWriter(memoryStream, bufferSize);
 
         // Act
@@ -55,11 +58,11 @@ public class BitStreamTests
 
         // Assert
         memoryStream.Seek(0, SeekOrigin.Begin);
-        var writtenBytes = new byte[bytes.Length];
+        var writtenBytes = new byte[bits.Length / 8];
 
-        await memoryStream.ReadExactlyAsync(writtenBytes, offset: 0, bytes.Length);
+        await memoryStream.ReadExactlyAsync(writtenBytes, offset: 0, bits.Length / 8);
 
-        writtenBytes.Should().BeEquivalentTo(bytes);
+        writtenBytes.Should().Equal(6, 1, 4, 4, 3, 2);
     }
 
     [Theory]
@@ -70,10 +73,8 @@ public class BitStreamTests
     {
         // Assign
 
-        // Letter 'a' represented in binary numbers as string type.
-        var word = "10000110";
-        // Each byte represents '1' or '0'. In other words, a byte represents a bit.
-        var bits = Encoding.ASCII.GetBytes(word);
+        // Letter 'a' represented in binary.
+        var bits = new byte[] { 0, 1, 1, 0, 0, 0, 0, 1 };
 
         await using var memoryStream = new MemoryStream(capacity: 1);
         await using var bitStream = new BitWriter(memoryStream, bufferSize);
@@ -87,7 +88,6 @@ public class BitStreamTests
         var writtenBytes = new byte[1];
 
         await memoryStream.ReadExactlyAsync(writtenBytes, offset: 0, 1);
-
-        writtenBytes.Should().BeEquivalentTo("a"u8.ToArray());
+        writtenBytes.Should().Equal("a"u8.ToArray());
     }
 }
