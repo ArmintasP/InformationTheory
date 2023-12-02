@@ -1,5 +1,7 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Hashing;
+using System.Net.WebSockets;
 
 namespace CompressionAlgorithms.ShannonFano;
 
@@ -22,7 +24,7 @@ public static class ShannonFanoUtils
             .ToDictionary(x => x.Key, x => x.Value);
 
         var codes = new Dictionary<byte[], List<byte>>(equalityComparer);
-        ConstructCodes(sortedFrequencies, sortedFrequencies.Keys.ToList(), codes);
+        ConstructCodes(sortedFrequencies, [.. sortedFrequencies.Keys], codes);
 
         return codes.ToDictionary(
             kv => kv.Key,
@@ -93,6 +95,15 @@ public static class ShannonFanoUtils
 
         public int GetHashCode([DisallowNull] byte[] obj)
         {
+            if (obj.Length <= 8)
+            {
+                var b = 0;
+                for (var i = 0; i < obj.Length; i++)
+                    b |= obj[i] << i;
+
+                return b.GetHashCode();
+            }
+
             return unchecked((int)XxHash32.HashToUInt32(obj));
         }
     }

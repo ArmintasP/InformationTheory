@@ -128,7 +128,7 @@ public sealed class ShannonFanoParserNode
             }
         });
 
-        return header.ToArray();
+        return [.. header];
     }
 
     private static void DepthFirstSearch(ShannonFanoParserNode node, Action<ShannonFanoParserNode> callBack)

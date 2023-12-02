@@ -7,7 +7,7 @@ Directory.CreateDirectory("Resources/output");
 foreach (var filePath in Directory.EnumerateFiles("Resources/canterbury"))
 {
     var fileName = Path.GetFileName(filePath);
-    await ShannonFanoEncoder.EncodeAsync(filePath, $"Resources/output/{fileName}", wordLength: 1300);
+    await ShannonFanoEncoder.EncodeAsync(filePath, $"Resources/output/{fileName}", wordLength: 17);
 }
 
 Directory.CreateDirectory("Resources/decoded");
