@@ -7,5 +7,5 @@ public struct ShannonFanoMetadata
     public int BitsAddedToFormLastByteCount { get; set; }
     public required Dictionary<byte[], byte[]> Codes { get; set; }
     public required ShannonFanoParserNode ParserTree { get; set; }
-    
+
 }

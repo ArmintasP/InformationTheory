@@ -37,7 +37,7 @@ public class ShannonFanoParserTreeTests
 
         // Act
         var header = tree.ConstructTreeHeader();
-        
+
         // Assert
         header.Should().Equal(header);
     }

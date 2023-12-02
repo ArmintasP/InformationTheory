@@ -1,6 +1,4 @@
-﻿using System.Collections;
-
-namespace CompressionAlgorithms.BitStream;
+﻿namespace CompressionAlgorithms.BitStream;
 
 public sealed class BitWriter : Stream
 {
@@ -33,19 +31,19 @@ public sealed class BitWriter : Stream
         while (bits.Length - (_writeBitsBuffer.Length - _writeBitsBufferPosition) > 0)
         {
             var remainingSpaceInWriteBuffer = _writeBitsBuffer.Length - _writeBitsBufferPosition;
-        
+
             writeBitsBuffer = new Span<byte>(_writeBitsBuffer, _writeBitsBufferPosition, remainingSpaceInWriteBuffer);
             bits[..remainingSpaceInWriteBuffer].CopyTo(writeBitsBuffer);
 
             bits = bits[remainingSpaceInWriteBuffer..];
             _writeBitsBufferPosition += remainingSpaceInWriteBuffer;
-            
+
             WriteToUnderlyingStream();
         }
 
         writeBitsBuffer = new Span<byte>(_writeBitsBuffer, _writeBitsBufferPosition, bits.Length);
         bits.CopyTo(writeBitsBuffer);
-        
+
         _writeBitsBufferPosition += bits.Length;
     }
 

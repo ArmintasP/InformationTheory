@@ -1,5 +1,4 @@
 ﻿using CompressionAlgorithms.BitStream;
-using System.IO;
 
 namespace CompressionAlgorithms.ShannonFano;
 

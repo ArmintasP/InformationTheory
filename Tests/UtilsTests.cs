@@ -20,7 +20,7 @@ public class UtilsTests
         var expectedEncodedBytes = Encoding.ASCII.GetBytes(expectedEncodedText)
             .Select(b => b is (byte)'0' ? (byte)0 : (byte)1)
             .ToArray();
-        
+
         encodedNumber.Should().Equal(expectedEncodedBytes);
     }
 
@@ -36,7 +36,7 @@ public class UtilsTests
         var streamAsBits = Encoding.ASCII.GetBytes(streamText)
             .Select(b => b is (byte)'0' ? (byte)0 : (byte)1)
             .ToArray();
-        
+
         var stream = new MemoryStream(streamAsBits);
 
         // Act
