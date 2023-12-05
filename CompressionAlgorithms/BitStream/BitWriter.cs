@@ -2,8 +2,6 @@
 
 public sealed class BitWriter : Stream
 {
-    public Stream BaseStream => _stream;
-
     private readonly Stream _stream;
 
     private readonly byte[] _writeBitsBuffer;
