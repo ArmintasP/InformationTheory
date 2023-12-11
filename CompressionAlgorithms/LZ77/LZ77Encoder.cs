@@ -5,11 +5,11 @@ public static  class LZ77Encoder
 {
     // BufferSize should be at least 4096 bytes.
     private const int BufferSizeMultiplier = 2048;  // -> taking smaller so that the buffer would be smaller than history
-    private const int WordLength = 8;  
-    private const int MaxMatchLenghtInBits = 4;     // -> with 4 bits, max length is 15
-    private static int _maxHistoryLength;
-    private static int _maxHistoryLengthInBytes;    // -> with 12 bytes, max offset is 2^12 = 4096
-    public static async Task CompressAsync(string filePath, string outputFilePath, int maxHistoryLength)
+    private const int WordLength = 8;         
+
+    private static int MaxHistoryLength;   
+    private static int MaxMatchLenght;        
+    public static async Task CompressAsync(string filePath, string outputFilePath, int maxHistoryLength, int maxMatchLength)
     {
         await using var fileReader = new FileStream(filePath, FileMode.Open);
 
@@ -23,8 +23,8 @@ public static  class LZ77Encoder
         var bufferSize = BufferSizeMultiplier * WordLength;
         var buffer = new byte[bufferSize];
         var history = new List<byte>();
-        _maxHistoryLength = (2^maxHistoryLength);
-        _maxHistoryLengthInBytes = maxHistoryLength;
+        MaxHistoryLength = maxHistoryLength;
+        MaxMatchLenght = maxMatchLength;
         int readBytesCount;
 
         while ((readBytesCount = await fileReader.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false)) > 0) 
@@ -47,13 +47,14 @@ public static  class LZ77Encoder
 
         var historySize = history.Count;
         var bufferSize = buffer.Length;
+        var maxMatchLength = (int)Math.Pow(2, MaxMatchLenght) - 1;
 
         var codingPos = 0;
 
         //1) history is empty, buffer full
         //2) try to find match
         //3) no match - add it to history and encode as record type 1, move buffer +1
-        //4) match - add it to history and encode as record type 2, move buffer + match_length
+        //4) match - add it to history and encode as record type 2, move buffer + matchLength
 
         while (codingPos < bufferSize)
         {
@@ -71,9 +72,13 @@ public static  class LZ77Encoder
             }
             else 
             {
+                if(matchLength >= maxMatchLength)
+                {
+                    matchLength = maxMatchLength;
+                }
                 //Console.WriteLine("FoundMatch!");
                 //Console.WriteLine("Buffer VIEW is:");
-                //foreach (byte b in buffer[coding_pos..buffer.Length])
+                //foreach (byte b in buffer[codingPos..buffer.Length])
                 //{
                 //    Console.Write($"{b} ");
                 //}
@@ -87,7 +92,7 @@ public static  class LZ77Encoder
                 //Console.WriteLine();
 
                 //Console.WriteLine("Match is:");
-                //foreach (byte b in history[match_offset..(match_offset + match_length)])
+                //foreach (byte b in history[matchOffset..(matchOffset + matchLength)]) //Exception here. But match length should not be longer than history length
                 //{
                 //    Console.Write($"{b} ");
                 //}
@@ -97,7 +102,7 @@ public static  class LZ77Encoder
                 codingPos += matchLength;
             }
 
-            if(historySize == _maxHistoryLength)
+            if(history.Count == (int)Math.Pow(2, MaxHistoryLength))
             {
                 history.Clear();
             }
@@ -128,8 +133,8 @@ public static  class LZ77Encoder
     {
         // Record2 is 17 bits -> (0, offset, length) <1,12,4> in bits
         byte[] recordType = Utils.ToBase2(0, 1);
-        byte[] binaryOffset = Utils.ToBase2(offset, _maxHistoryLengthInBytes);
-        byte[] binaryLenght = Utils.ToBase2(length, MaxMatchLenghtInBits);
+        byte[] binaryOffset = Utils.ToBase2(offset, MaxHistoryLength);
+        byte[] binaryLenght = Utils.ToBase2(length, MaxMatchLenght);
         var record = recordType.Concat(binaryOffset).Concat(binaryLenght).ToArray();
         //Console.WriteLine($"Record is:");
         //foreach (byte b in record)
