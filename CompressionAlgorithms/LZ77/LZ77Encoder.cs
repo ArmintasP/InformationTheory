@@ -7,10 +7,20 @@ public static  class LZ77Encoder
     private const int BufferSizeMultiplier = 2048;  // -> taking smaller so that the buffer would be smaller than history
     private const int WordLength = 8;         
 
-    private static int MaxHistoryLength;   
-    private static int MaxMatchLenght;        
+    private static int MaxHistoryLengthInBits; 
+    private static int MaxMatchLenghtInBits;  
+    private static int MaxHistoryLength;
+    private static int MaxMatchLength;
+    private static int BreakEvenPoint;      
     public static async Task CompressAsync(string filePath, string outputFilePath, int maxHistoryLength, int maxMatchLength)
     {
+        MaxHistoryLengthInBits = maxHistoryLength;
+        MaxMatchLenghtInBits = maxMatchLength;
+        BreakEvenPoint = (MaxHistoryLengthInBits + MaxMatchLenghtInBits) / 8;
+
+        MaxHistoryLength = (int)Math.Pow(2, maxHistoryLength) - 1;
+        MaxMatchLength = (int)Math.Pow(2, maxMatchLength) - 1;
+
         await using var fileReader = new FileStream(filePath, FileMode.Open);
 
         await using var fileWriter = new FileStream(outputFilePath, FileMode.Create);
@@ -23,8 +33,7 @@ public static  class LZ77Encoder
         var bufferSize = BufferSizeMultiplier * WordLength;
         var buffer = new byte[bufferSize];
         var history = new List<byte>();
-        MaxHistoryLength = maxHistoryLength;
-        MaxMatchLenght = maxMatchLength;
+
         int readBytesCount;
 
         while ((readBytesCount = await fileReader.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false)) > 0) 
@@ -47,38 +56,36 @@ public static  class LZ77Encoder
 
         var historySize = history.Count;
         var bufferSize = buffer.Length;
-        var maxMatchLength = (int)Math.Pow(2, MaxMatchLenght) - 1;
 
         var codingPos = 0;
 
         //1) history is empty, buffer full
         //2) try to find match
-        //3) no match - add it to history and encode as record type 1, move buffer +1
-        //4) match - add it to history and encode as record type 2, move buffer + matchLength
+        //3) no match - encode as record type 1, (move buffer +1), add to history +1
+        //4) match (longer than breakEvenPoint)- encode as record type 2, move buffer + matchLength, add to history + match length
 
         while (codingPos < bufferSize)
         {
             int matchOffset = 0;
             int matchLength = 0;
+            int bufferViewEndIndex = (codingPos + MaxMatchLength) > bufferSize 
+                ? bufferSize 
+                : MaxMatchLength + codingPos;
 
-            LZ77Utils.GetLongestMatchStupid([..history], buffer[codingPos..buffer.Length], out matchOffset, out matchLength);
+            //having histo as list may not be a great idea
+            LZ77Utils.GetLongestMatchStupid([..history], buffer[codingPos..bufferViewEndIndex], out matchOffset, out matchLength);
 
-            if (matchLength <= 2)
+            if (matchLength <= BreakEvenPoint)
             {
                 encodedText.AddRange(CreateType1Record(buffer[codingPos]));
                 history.Add(buffer[codingPos]);
                 codingPos++;
-
             }
             else 
             {
-                if(matchLength >= maxMatchLength)
-                {
-                    matchLength = maxMatchLength;
-                }
                 //Console.WriteLine("FoundMatch!");
                 //Console.WriteLine("Buffer VIEW is:");
-                //foreach (byte b in buffer[codingPos..buffer.Length])
+                //foreach (byte b in buffer[codingPos..bufferViewEndIndex])
                 //{
                 //    Console.Write($"{b} ");
                 //}
@@ -92,17 +99,18 @@ public static  class LZ77Encoder
                 //Console.WriteLine();
 
                 //Console.WriteLine("Match is:");
-                //foreach (byte b in history[matchOffset..(matchOffset + matchLength)]) //Exception here. But match length should not be longer than history length
+                //foreach (byte b in history[matchOffset..(matchOffset + matchLength)])
                 //{
                 //    Console.Write($"{b} ");
                 //}
                 //Console.WriteLine("\n");
+
                 encodedText.AddRange(CreateType2Record(matchOffset, matchLength));
                 history.AddRange(buffer[codingPos..(codingPos + matchLength)]);
                 codingPos += matchLength;
             }
 
-            if(history.Count == (int)Math.Pow(2, MaxHistoryLength))
+            if(history.Count == MaxHistoryLength)
             {
                 history.Clear();
             }
@@ -131,12 +139,12 @@ public static  class LZ77Encoder
 
     private static byte[] CreateType2Record(int offset, int length)
     {
-        // Record2 is 17 bits -> (0, offset, length) <1,12,4> in bits
+        // Record2 is x bits -> (0, offset, length) <1,MaxHistoryLenght,MaxMatchLength> in bits
         byte[] recordType = Utils.ToBase2(0, 1);
-        byte[] binaryOffset = Utils.ToBase2(offset, MaxHistoryLength);
-        byte[] binaryLenght = Utils.ToBase2(length, MaxMatchLenght);
+        byte[] binaryOffset = Utils.ToBase2(offset, MaxHistoryLengthInBits);
+        byte[] binaryLenght = Utils.ToBase2(length, MaxMatchLenghtInBits);
         var record = recordType.Concat(binaryOffset).Concat(binaryLenght).ToArray();
-        //Console.WriteLine($"Record is:");
+        //Console.WriteLine($"Record length {record.Length} and record is:");
         //foreach (byte b in record)
         //{
         //    Console.Write($"{b}");

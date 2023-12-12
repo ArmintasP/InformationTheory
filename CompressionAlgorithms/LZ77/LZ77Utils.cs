@@ -40,7 +40,7 @@ internal class LZ77Utils
             int k = 1;
             while (offset + k < history.Length)
             {
-                if (k < buffer.Length -1 && history[offset + k] == buffer[k])
+                if (k < buffer.Length && history[offset + k] == buffer[k])
                 {
                     length++;
                 }

@@ -15,6 +15,7 @@ foreach (var filePath in Directory.EnumerateFiles("Resources/easy"))
 {
     var fileName = Path.GetFileName(filePath);
     await LZ77Encoder.CompressAsync(filePath, $"Resources/output/{fileName}", maxHistoryLength: 12, maxMatchLength: 4);
+    //parameters are given as degree of 2 (in bits)
 }
 
 //Directory.CreateDirectory("Resources/decoded");
