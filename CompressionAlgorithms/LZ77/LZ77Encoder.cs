@@ -21,6 +21,9 @@ public static  class LZ77Encoder
         MaxHistoryLength = (int)Math.Pow(2, maxHistoryLength) - 1;
         MaxMatchLength = (int)Math.Pow(2, maxMatchLength) - 1;
 
+        double record2Length = MaxHistoryLengthInBits + MaxMatchLenghtInBits + 1;
+        BreakEvenPoint = (int)Math.Ceiling(record2Length / 9);
+
         await using var fileReader = new FileStream(filePath, FileMode.Open);
 
         await using var fileWriter = new FileStream(outputFilePath, FileMode.Create);
@@ -30,9 +33,10 @@ public static  class LZ77Encoder
         bitWriter.Write(header);
 
 
-        var bufferSize = BufferSize;
+        var bufferSize = BufferSize * WordLength;
         var buffer = new byte[bufferSize];
-        var history = new List<byte>();//new byte[MaxHistoryLength];
+        var history = new byte[MaxHistoryLength];
+        var historyPos = 0;
 
         int readBytesCount;
 
@@ -44,17 +48,17 @@ public static  class LZ77Encoder
 
             var text = buffer[..bitCount];
 
-            var encodedText = Compress(history, text);
+            var encodedText = Compress(history, historyPos, text);
             bitWriter.Write(encodedText);
         }
         var bitsAddedToFormLastByteCount = bitWriter.FillRemainingBitsToFormAByte();
         await OverwriteHeaderAsync(header, bitsAddedToFormLastByteCount, bitWriter);
     }
-    private static byte[] Compress(List<byte> history, byte[] buffer)
+    private static byte[] Compress(byte[] history, int historyPos, byte[] buffer)
     {
         var encodedText = new List<byte>();
 
-        var historySize = history.Count;
+        var historySize = historyPos;
         var bufferSize = buffer.Length;
 
         var codingPos = 0;
@@ -72,18 +76,25 @@ public static  class LZ77Encoder
                 ? bufferSize 
                 : MaxMatchLength + codingPos;
 
-            //Having histo as list may not be a great idea
-            LZ77Utils.GetLongestMatchStupid([..history], buffer[codingPos..bufferViewEndIndex], out matchOffset, out matchLength);
+            LZ77Utils.GetLongestMatchStupid(history[..historyPos], buffer[codingPos..bufferViewEndIndex], out matchOffset, out matchLength);
 
             if (matchLength <= BreakEvenPoint)
             {
                 encodedText.AddRange(CreateType1Record(buffer[codingPos]));
-                history.Add(buffer[codingPos]);
+
+                if (historyPos + 1 > MaxHistoryLength)
+                {
+                    Array.Clear(history);
+                    historyPos = 0;
+                }
+                Array.Copy(buffer, codingPos, history, historyPos, 1);
+                historyPos++;
                 codingPos++;
             }
             else 
             {
-                //Console.WriteLine("FoundMatch!");
+                //Console.WriteLine($"History lenght (pos): {history[..historyPos].Length}, buffer view length {buffer[codingPos..bufferViewEndIndex].Length}  " +
+                //    $"match offset {matchOffset} length {matchLength}");
                 //Console.WriteLine("Buffer VIEW is:");
                 //foreach (byte b in buffer[codingPos..bufferViewEndIndex])
                 //{
@@ -92,7 +103,7 @@ public static  class LZ77Encoder
                 //Console.WriteLine();
 
                 //Console.WriteLine("History is:");
-                //foreach (byte b in history)
+                //foreach (byte b in history[..historyPos])
                 //{
                 //    Console.Write($"{b} ");
                 //}
@@ -106,13 +117,21 @@ public static  class LZ77Encoder
                 //Console.WriteLine("\n");
 
                 encodedText.AddRange(CreateType2Record(matchOffset, matchLength));
-                history.AddRange(buffer[codingPos..(codingPos + matchLength)]);
+                if (historyPos + matchLength > MaxHistoryLength)
+                {
+                    Array.Clear(history);
+                    historyPos = 0;
+                }
+                Array.Copy(buffer, codingPos, history, historyPos, matchLength);
                 codingPos += matchLength;
+                historyPos += matchLength;
             }
 
-            if(history.Count == MaxHistoryLength)
+            if(historySize == MaxHistoryLength)
             {
-                history.Clear();
+                Array.Clear(history);
+                historyPos = 0;
+
             }
         }
         return [.. encodedText];
