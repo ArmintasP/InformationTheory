@@ -1,20 +1,28 @@
-﻿using CompressionAlgorithms.ShannonFano;
-using System.Diagnostics;
+﻿using CompressionAlgorithms;
 
-var s = Stopwatch.StartNew();
+Console.WriteLine("Choose compresion algorithm: ");
+Console.WriteLine("\t1 - Shanon-Fano\n");
 
-Directory.CreateDirectory("Resources/output");
-foreach (var filePath in Directory.EnumerateFiles("Resources/canterbury"))
+bool continueWork = true;
+while (continueWork)
 {
-    var fileName = Path.GetFileName(filePath);
-    await ShannonFanoEncoder.EncodeAsync(filePath, $"Resources/output/{fileName}", wordLength: 17);
-}
+    var actionNum = SimpleUI.GetActionNumber();
 
-Directory.CreateDirectory("Resources/decoded");
-foreach (var filePath in Directory.EnumerateFiles("Resources/output"))
-{
-    var fileName = Path.GetFileName(filePath);
-    await ShannonFanoDecoder.DecodeAsync(filePath, $"Resources/decoded/{fileName}");
+    switch(actionNum)
+    {
+        case 1:
+            await SimpleUI.EncodeFileShanonFano();
+            break;
+        case 2:
+            await SimpleUI.DecodeFileShanonFano();
+            break;
+        case 3:
+            await SimpleUI.UseProvidedExamples();
+            break;          
+        case 4:
+            continueWork = false;
+            break;
+        default:
+            continue;   
+    }
 }
-
-Console.WriteLine(s.Elapsed);
