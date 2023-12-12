@@ -4,7 +4,7 @@ namespace CompressionAlgorithms.LZ77;
 public static  class LZ77Encoder
 {
     // BufferSize should be at least 4096 bytes.
-    private const int BufferSizeMultiplier = 2048;  // -> taking smaller so that the buffer would be smaller than history
+    private const int BufferSize = 2048;  // -> taking smaller so that the buffer would be smaller than history
     private const int WordLength = 8;         
 
     private static int MaxHistoryLengthInBits; 
@@ -30,9 +30,9 @@ public static  class LZ77Encoder
         bitWriter.Write(header);
 
 
-        var bufferSize = BufferSizeMultiplier * WordLength;
+        var bufferSize = BufferSize;
         var buffer = new byte[bufferSize];
-        var history = new List<byte>();
+        var history = new List<byte>();//new byte[MaxHistoryLength];
 
         int readBytesCount;
 
@@ -72,7 +72,7 @@ public static  class LZ77Encoder
                 ? bufferSize 
                 : MaxMatchLength + codingPos;
 
-            //having histo as list may not be a great idea
+            //Having histo as list may not be a great idea
             LZ77Utils.GetLongestMatchStupid([..history], buffer[codingPos..bufferViewEndIndex], out matchOffset, out matchLength);
 
             if (matchLength <= BreakEvenPoint)
