@@ -1,28 +1,32 @@
 ﻿using CompressionAlgorithms;
 
-Console.WriteLine("Choose compresion algorithm: ");
-Console.WriteLine("\t1 - Shanon-Fano\n");
+var compressionAlgorithm = SimpleUI.GetChoosenAlgorithmNumber(); 
 
 bool continueWork = true;
 while (continueWork)
 {
-    var actionNum = SimpleUI.GetActionNumber();
+   
 
-    switch(actionNum)
+    var actionNum = (UserAction)SimpleUI.GetActionNumber();
+
+    switch (actionNum)
     {
-        case 1:
-            await SimpleUI.EncodeFileShanonFano();
+        case UserAction.EncodeFile:
+            await SimpleUI.EncodeFile(compressionAlgorithm);
             break;
-        case 2:
-            await SimpleUI.DecodeFileShanonFano();
+        case UserAction.DecodeFile:
+            await SimpleUI.DecodeFile(compressionAlgorithm);
             break;
-        case 3:
-            await SimpleUI.UseProvidedExamples();
-            break;          
-        case 4:
+        case UserAction.UseProvidedExamples:
+            await SimpleUI.UseProvidedExamples(compressionAlgorithm);
+            break;
+        case UserAction.ChangeAlgorithm:
+            compressionAlgorithm = SimpleUI.GetChoosenAlgorithmNumber();
+            break;
+        case UserAction.Exit:
             continueWork = false;
             break;
         default:
-            continue;   
+            continue;
     }
 }
