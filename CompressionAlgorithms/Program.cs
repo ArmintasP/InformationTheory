@@ -11,11 +11,11 @@ Directory.CreateDirectory("Resources/output");
 ////}
 
 
-foreach (var filePath in Directory.EnumerateFiles("Resources/easy"))
+foreach (var filePath in Directory.EnumerateFiles("Resources/canterbury"))
 {
     var fileName = Path.GetFileName(filePath);
     await LZSSEncoder.CompressAsync(filePath, $"Resources/output/{fileName}", maxHistoryLength: 12, maxMatchLength: 4, searchDepth: 0);
-    //parameters are given as degree of 2 (in bits)
+    //First two parameters are given as degree of 2 (in bits)
 }
 
 Console.WriteLine(s.Elapsed);

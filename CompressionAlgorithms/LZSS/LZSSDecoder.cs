@@ -16,12 +16,12 @@ internal class LZSSDecoder
         await using var bitWriter = new BitWriter(fileWriter);
 
         var metadata = GetMetadata(bitReader);
-        MaxHistoryLength = (int)Math.Pow(2, metadata.MaxHistoryLength) - 1;
+        MaxHistoryLength = ((int)Math.Pow(2, metadata.MaxHistoryLength) - 1) * WordLength;
 
         bitReader.IgnoreNLastBitsWhenEOF(metadata.BitsAddedToFormLastByteCount);
 
-        var buffer = new byte[MaxHistoryLength * WordLength * metadata.MaxMatchLenght];
-        var history = new byte[MaxHistoryLength * WordLength];
+        var buffer = new byte[MaxHistoryLength * metadata.MaxMatchLenght];
+        var history = new byte[MaxHistoryLength];
         var historyPos = 0;
 
         var leftovers = new List<byte>();
@@ -31,15 +31,11 @@ internal class LZSSDecoder
 
         while ((readBitsCount = await bitReader.ReadAtLeastAsync(buffer, minimumBytes: buffer.Length, throwOnEndOfStream: false)) > 0)
         {
-            var bitCount = readBitsCount >= buffer.Length
-            ? readBitsCount
-            : readBitsCount;
-
-            var text = buffer[..bitCount];
+            var text = buffer[..readBitsCount];
 
             if (leftovers.Count > 0)
             {
-                text = leftovers.Concat(buffer[..bitCount]).ToArray();
+                text = leftovers.Concat(buffer[..readBitsCount]).ToArray();
             }
             var decodedText = Decode(text, history, ref historyPos, leftovers, metadata);
 
@@ -52,15 +48,22 @@ internal class LZSSDecoder
         var decodingPos = 0;
         leftovers.Clear();
 
+        //1) Get indicator bit 
+        //2.a) indicator == 1 : decoded word is next 8 bits
+        //2.b) indicator == 0 : next maxHistoryLength bits is offset, next maxMatchLenght bits is length write from history
+        //3) If buffer does not contain all record. Method returns to get more from input stream.
+        //4) Clear history if it reached maxHistoryLength
+        //5) Add to history the word found.
+
         while (decodingPos < buffer.Length)
         {
-            var indicator = buffer[decodingPos]; //gets first BIT
+            var indicator = buffer[decodingPos];
             decodingPos++;
 
-            if (indicator == (byte)1)
+            if (indicator == 1)
             {
-                //deal with buffer 'leftovers' -> end of record is still not read:
-                if (decodingPos + WordLength > buffer.Length)
+                var record1Length = decodingPos + WordLength;
+                if (record1Length > buffer.Length)
                 {
                     leftovers.AddRange(buffer[(decodingPos-1)..buffer.Length]);
                     return decodedText;
@@ -68,7 +71,7 @@ internal class LZSSDecoder
 
                 var decodedWord = buffer[decodingPos..(decodingPos + WordLength)];
 
-                if (historyPos + WordLength > (MaxHistoryLength * WordLength))
+                if (historyPos + WordLength > MaxHistoryLength)
                 {
                     Array.Clear(history);
                     historyPos = 0;
@@ -77,89 +80,45 @@ internal class LZSSDecoder
                 decodingPos += WordLength;
                 historyPos += WordLength;
 
-                //Console.WriteLine("History is:");
-                //for (int i = 0; i < historyPos; i += WordLength)
-                //{
-                //    Console.Write((char)ConvertToNumber(history[i..(i + WordLength)]));
-                //}
-                //Console.WriteLine();
-
                 decodedText.AddRange(decodedWord);
 
             }
             else
             {
-                if (decodingPos + metadata.MaxHistoryLength + metadata.MaxMatchLenght  > buffer.Length)
+                var record2Length = decodingPos + metadata.MaxHistoryLength + metadata.MaxMatchLenght;
+                if (record2Length > buffer.Length)
                 {
                     leftovers.AddRange(buffer[(decodingPos-1)..buffer.Length]);
                     return decodedText;
                 }
 
-                var offset = buffer[decodingPos..(decodingPos + metadata.MaxHistoryLength)]; //read offset in bits
-                var offsetIndex = ConvertToNumber(offset);
+                var offset = buffer[decodingPos..(decodingPos + metadata.MaxHistoryLength)];
+                var offsetIndex = LZSSUtils.ConvertToNumber(offset);
                 decodingPos += metadata.MaxHistoryLength;
 
-                var length = buffer[decodingPos..(decodingPos + metadata.MaxMatchLenght)]; //read length in bits
-                var matchLength = ConvertToNumber(length);                   
+                var length = buffer[decodingPos..(decodingPos + metadata.MaxMatchLenght)];
+                var matchLength = LZSSUtils.ConvertToNumber(length);                   
                 decodingPos += metadata.MaxMatchLenght;
 
                 var decodedWord = history[(offsetIndex * WordLength)..((offsetIndex + matchLength) * WordLength)];
 
-                //Console.WriteLine($"({offsetIndex},{matchLength})");
-                //Console.WriteLine("Word to insert:");
-                //for (int i = 0; i < decodedWord.Length; i += WordLength)
-                //{
-                //    Console.Write((char)ConvertToNumber(decodedWord[i..(i + WordLength)]));
-                //}
                 decodedText.AddRange(decodedWord);
                 
-                if (historyPos + (matchLength * WordLength) > (MaxHistoryLength * WordLength))
+                if (historyPos + (matchLength * WordLength) > MaxHistoryLength)
                 {
                     Array.Clear(history);
                     historyPos = 0;
                 }
                 Array.Copy(decodedWord, 0, history, historyPos, decodedWord.Length);
                 historyPos += WordLength * matchLength;
-                //Console.WriteLine("History is:");
-                //for (int i = 0; i < historyPos; i += WordLength)
-                //{
-                //    Console.Write((char)ConvertToNumber(history[i..(i + WordLength)]));
-                //}
-                //Console.WriteLine();
-
             }
         }
-        if(historyPos == MaxHistoryLength*WordLength)
+        if(historyPos == MaxHistoryLength)
         {
-            //Console.WriteLine("History is:");
-            //for (int i = 0; i < historyPos; i += WordLength)
-            //{
-            //    Console.Write(ConvertToChar(history[i..(i + WordLength)]));
-            //}
-            //Console.WriteLine();
             Array.Clear(history);
             historyPos = 0;
         }
         return decodedText;
-    }
-    private static int ConvertToNumber(byte[] numberInBits)
-    {
-        int result = 0;
-
-        for (int i = 0; i < numberInBits.Length; i++)
-        {
-            // Shift the current result to the left by one bit
-            result <<= 1;
-
-            // If the current bit is 1, set the least significant bit of the result to 1
-            if (numberInBits[i] != 0) 
-            {
-                result |= 1;
-            }
-        }
-
-        return result;
-
     }
 
     private static LZSSMetadata GetMetadata(BitReader bitReader)
@@ -178,5 +137,4 @@ internal class LZSSDecoder
             MaxMatchLenght = maxMatchLenght
         };
     }
-
 }

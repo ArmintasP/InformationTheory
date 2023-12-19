@@ -20,34 +20,33 @@ internal class LZSSUtils
         {
             //Find start of k-th substring (starts from end of last substring found)
             isMatch = false;
-            for (int j = offset + length; j < history.Length; j++)
+            for (int i = offset + length; i < history.Length; i++)
             {
-                if (history[j] == buffer[0]) //always search from the START of buffer
+                if (history[i] == buffer[0])
                 {
                     isMatch = true;
                     length = 1;
-                    offset = j;
+                    offset = i;
                     break;
                 }
             }
 
-            //Find length of substring found
-            if (isMatch && buffer.Length > 1) //feels like I could make this simpler.
+            //Find length of k-th substring 
+            if (isMatch && buffer.Length > 1)
             {
-                int k = 1;
-                while (offset + k < history.Length)
+                int j = 1;
+                while (offset + j < history.Length)
                 {
-                    if (k < buffer.Length && history[offset + k] == buffer[k])
+                    if (j < buffer.Length && history[offset + j] == buffer[j])
                     {
                         length++;
                     }
                     else
                     {
-                        //End of k-th substring is here.
                         kCommonSubstrings.Add((offset, length));
                         break;
                     }
-                    k++;
+                    j++;
                 }
             }
 
@@ -57,7 +56,7 @@ internal class LZSSUtils
             }
         }
 
-        //Search is done:
+        //Find longest of substrings:
         if (kCommonSubstrings.Count != 0)
         {
             longestSubstring = kCommonSubstrings.OrderByDescending(t => t.Item2).First();
@@ -65,5 +64,31 @@ internal class LZSSUtils
             length = longestSubstring.Item2;
         }
         return;
+    }
+
+    public static byte[] ConvertToBitArray(byte myByte)
+    {
+        byte[] bits = new byte[8];
+
+        for (int i = 7; i >= 0; i--)
+        {
+            bits[i] = (byte)((myByte >> (7 - i)) & 1);
+        }
+        return bits;
+    }
+    public static int ConvertToNumber(byte[] numberInBits)
+    {
+        int result = 0;
+
+        for (int i = 0; i < numberInBits.Length; i++)
+        {
+            result <<= 1;
+
+            if (numberInBits[i] != 0)
+            {
+                result |= 1;
+            }
+        }
+        return result;
     }
 }
