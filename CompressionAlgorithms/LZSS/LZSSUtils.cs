@@ -1,7 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.IO.Hashing;
-
-namespace CompressionAlgorithms.LZSS;
+﻿namespace CompressionAlgorithms.LZSS;
 
 internal class LZSSUtils
 {
