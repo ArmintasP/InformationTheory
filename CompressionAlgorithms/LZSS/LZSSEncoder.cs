@@ -1,17 +1,17 @@
 ﻿using CompressionAlgorithms.BitStream;
 namespace CompressionAlgorithms.LZSS;
 
-public static  class LZSSEncoder
+public static class LZSSEncoder
 {
     // BufferSize should be at least 4096 bytes.
-    private const int BufferSize = 4096; //why changing this affects the result
-    private const int WordLength = 8;         
+    private const int BufferSize = 4096; //why changing this affects the result (as in where the issue happens)
+    private const int WordLength = 8;
 
-    private static int MaxHistoryLengthInBits; 
-    private static int MaxMatchLenghtInBits;  
+    private static int MaxHistoryLengthInBits;
+    private static int MaxMatchLenghtInBits;
     private static int MaxHistoryLength;
     private static int MaxMatchLength;
-    private static int BreakEvenPoint;      
+    private static int BreakEvenPoint;
     public static async Task CompressAsync(string filePath, string outputFilePath, int maxHistoryLength, int maxMatchLength)
     {
         MaxHistoryLengthInBits = maxHistoryLength;
@@ -40,17 +40,12 @@ public static  class LZSSEncoder
         var historyPos = 0;
 
         int readBytesCount;
-        //TODO: check with Sam example in wiki. The supression is suspiciously bad. Still not good even after checking
-        //not sure what is wrong. Is it actually wrong thou?
 
         //TODO:
-        // 1) create correct header. (bits added, maxHistorySize, maxMatchLength) ~5+4+7=16 ~ 2 bytes header
-            // check if header is constructed correctly ++ (seems correct) //dont think its workth using elias gamma code for it thou
-        // 2) implement decoder
         // 3) implement additional search algorithms
 
 
-        while ((readBytesCount = await fileReader.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false)) > 0) 
+        while ((readBytesCount = await fileReader.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false)) > 0)
         {
             var bitCount = readBytesCount >= buffer.Length
                 ? readBytesCount
@@ -67,8 +62,6 @@ public static  class LZSSEncoder
     private static byte[] Compress(byte[] history, ref int historyPos, byte[] buffer)
     {
         var encodedText = new List<byte>();
-
-        var historySize = historyPos;
         var bufferSize = buffer.Length;
 
         var codingPos = 0;
@@ -82,19 +75,24 @@ public static  class LZSSEncoder
         {
             int matchOffset = 0;
             int matchLength = 0;
-            int bufferViewEndIndex = (codingPos + MaxMatchLength) > bufferSize 
-                ? bufferSize 
+            int bufferViewEndIndex = (codingPos + MaxMatchLength) > bufferSize
+                ? bufferSize
                 : MaxMatchLength + codingPos;
 
             LZSSUtils.GetLongestMatchStupid(history[..historyPos], buffer[codingPos..bufferViewEndIndex], out matchOffset, out matchLength);
 
             if (matchLength <= BreakEvenPoint)
             {
-                //Possible problem here??
                 encodedText.AddRange(CreateType1Record(buffer[codingPos]));
 
                 if (historyPos + 1 > MaxHistoryLength)
                 {
+                    //Console.WriteLine("ENCODER History is before delete1:");
+                    //foreach (char b in history[..historyPos])
+                    //{
+                    //    Console.Write($"{b}");
+                    //}
+                    //Console.WriteLine();
                     Array.Clear(history);
                     historyPos = 0;
                 }
@@ -102,7 +100,7 @@ public static  class LZSSEncoder
                 historyPos++;
                 codingPos++;
             }
-            else 
+            else
             {
                 //Console.WriteLine($"History lenght (pos): {history[..historyPos].Length}, " +
                 //    $"match offset {matchOffset} length {matchLength}");
@@ -130,7 +128,7 @@ public static  class LZSSEncoder
                 encodedText.AddRange(CreateType2Record(matchOffset, matchLength));
                 if (historyPos + matchLength > MaxHistoryLength)
                 {
-                    //Console.WriteLine("ENCODER History is before delete:");
+                    //Console.WriteLine("ENCODER History is before delete2:");
                     //foreach (char b in history[..historyPos])
                     //{
                     //    Console.Write($"{b}");
@@ -139,14 +137,14 @@ public static  class LZSSEncoder
                     Array.Clear(history);
                     historyPos = 0;
                 }
-                Array.Copy(buffer, codingPos, history, historyPos, matchLength); 
+                Array.Copy(buffer, codingPos, history, historyPos, matchLength);
                 codingPos += matchLength;
                 historyPos += matchLength;
             }
 
-            if(historySize == MaxHistoryLength)
+            if (historyPos == MaxHistoryLength)
             {
-                //Console.WriteLine("ENCODER History is before delete:");
+                //Console.WriteLine("ENCODER History is before delete3:");
                 //foreach (char b in history[..historyPos])
                 //{
                 //    Console.Write($"{b}");
@@ -176,7 +174,7 @@ public static  class LZSSEncoder
 
         for (int i = 7; i >= 0; i--)
         {
-            bits[i] = (byte)((myByte >> (7-i)) & 1); //no need to reverse this way
+            bits[i] = (byte)((myByte >> (7 - i)) & 1); //no need to reverse this way
         }
         return bits;
     }
@@ -238,19 +236,5 @@ public static  class LZSSEncoder
             MaxMatchLenght = maxMatchLength,
         };
     }
-
-    ////Not needed for LZSS - the word length is always 8 bits!
-    //private static int GetBitsAddedToLastWordCount(int wordLength, long fileLength)
-    //{
-    //    var bitsFromLastWordCount = wordLength > fileLength
-    //        ? (int)fileLength
-    //        : (int)(fileLength % wordLength);
-
-    //    var bitsAddedToLastWordCount = bitsFromLastWordCount != 0
-    //        ? wordLength - bitsFromLastWordCount
-    //        : 0;
-
-    //    return bitsAddedToLastWordCount;
-    //}
 }
 
