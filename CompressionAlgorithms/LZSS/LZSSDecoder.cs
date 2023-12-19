@@ -20,7 +20,7 @@ internal class LZSSDecoder
 
         bitReader.IgnoreNLastBitsWhenEOF(metadata.BitsAddedToFormLastByteCount);
 
-        var buffer = new byte[MaxHistoryLength * WordLength];
+        var buffer = new byte[MaxHistoryLength * WordLength * metadata.MaxMatchLenght];
         var history = new byte[MaxHistoryLength * WordLength];
         var historyPos = 0;
 
@@ -77,6 +77,13 @@ internal class LZSSDecoder
                 decodingPos += WordLength;
                 historyPos += WordLength;
 
+                //Console.WriteLine("History is:");
+                //for (int i = 0; i < historyPos; i += WordLength)
+                //{
+                //    Console.Write((char)ConvertToNumber(history[i..(i + WordLength)]));
+                //}
+                //Console.WriteLine();
+
                 decodedText.AddRange(decodedWord);
 
             }
@@ -102,7 +109,7 @@ internal class LZSSDecoder
                 //Console.WriteLine("Word to insert:");
                 //for (int i = 0; i < decodedWord.Length; i += WordLength)
                 //{
-                //    Console.Write(ConvertToChar(decodedWord[i..(i + WordLength)]));
+                //    Console.Write((char)ConvertToNumber(decodedWord[i..(i + WordLength)]));
                 //}
                 decodedText.AddRange(decodedWord);
                 
@@ -116,7 +123,7 @@ internal class LZSSDecoder
                 //Console.WriteLine("History is:");
                 //for (int i = 0; i < historyPos; i += WordLength)
                 //{
-                //    Console.Write(ConvertToChar(history[i..(i + WordLength)]));
+                //    Console.Write((char)ConvertToNumber(history[i..(i + WordLength)]));
                 //}
                 //Console.WriteLine();
 

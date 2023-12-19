@@ -1,27 +1,25 @@
 ﻿using CompressionAlgorithms.BitStream;
 namespace CompressionAlgorithms.LZSS;
 
+internal class EncoderParameters
+{
+    public int MaxHistoryLengthInBits;
+    public int MaxMatchLengthInBits;
+    public int MaxHistoryLength;
+    public int MaxMatchLength;
+    public int BreakEvenPoint;
+    public int SearchDepth;
+}
 public static class LZSSEncoder
 {
     // BufferSize should be at least 4096 bytes.
-    private const int BufferSize = 4096; //why changing this affects the result (as in where the issue happens)
+    private const int BufferSize = 1024;
     private const int WordLength = 8;
 
-    private static int MaxHistoryLengthInBits;
-    private static int MaxMatchLenghtInBits;
-    private static int MaxHistoryLength;
-    private static int MaxMatchLength;
-    private static int BreakEvenPoint;
-    public static async Task CompressAsync(string filePath, string outputFilePath, int maxHistoryLength, int maxMatchLength)
+    private static EncoderParameters EncoderParameters = new();
+    public static async Task CompressAsync(string filePath, string outputFilePath, int maxHistoryLength, int maxMatchLength, int searchDepth)
     {
-        MaxHistoryLengthInBits = maxHistoryLength;
-        MaxMatchLenghtInBits = maxMatchLength;
-
-        MaxHistoryLength = (int)Math.Pow(2, maxHistoryLength) - 1;
-        MaxMatchLength = (int)Math.Pow(2, maxMatchLength) - 1;
-
-        double record2Length = MaxHistoryLengthInBits + MaxMatchLenghtInBits + 1;
-        BreakEvenPoint = (int)Math.Ceiling(record2Length / 9);
+        EncoderParameters = CalculateParameters(maxHistoryLength, maxMatchLength, searchDepth);
 
         await using var fileReader = new FileStream(filePath, FileMode.Open);
 
@@ -36,24 +34,17 @@ public static class LZSSEncoder
 
         var bufferSize = BufferSize;
         var buffer = new byte[bufferSize];
-        var history = new byte[MaxHistoryLength];
+        var history = new byte[EncoderParameters.MaxHistoryLength];
         var historyPos = 0;
 
         int readBytesCount;
 
-        //TODO:
-        // 3) implement additional search algorithms
-
-
         while ((readBytesCount = await fileReader.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false)) > 0)
-        {
-            var bitCount = readBytesCount >= buffer.Length
-                ? readBytesCount
-                : readBytesCount; //no need for BitsAddedToLastWordCount, as the word length is ALWAYS 8 bits
-
-            var text = buffer[..bitCount];
+        { 
+            var text = buffer[..readBytesCount];
 
             var encodedText = Compress(history, ref historyPos, text);
+
             bitWriter.Write(encodedText);
         }
         var bitsAddedToFormLastByteCount = bitWriter.FillRemainingBitsToFormAByte();
@@ -68,24 +59,26 @@ public static class LZSSEncoder
 
         //1) history is empty, buffer full
         //2) try to find match
-        //3) no match - encode as record type 1, (move buffer +1), add to history +1
-        //4) match (longer than breakEvenPoint)- encode as record type 2, move buffer + matchLength, add to history + match length
+        //3) no match - encode as record type 1, (move buffer +1), (add to history +1)
+        //4) match ( is longer than breakEvenPoint) - encode as record type 2, move buffer + matchLength, add to history + match length
 
         while (codingPos < bufferSize)
         {
-            int matchOffset = 0;
-            int matchLength = 0;
-            int bufferViewEndIndex = (codingPos + MaxMatchLength) > bufferSize
+            var matchOffset = 0;
+            var matchLength = 0;
+
+            int bufferViewEndIndex = (codingPos + EncoderParameters.MaxMatchLength) > bufferSize
                 ? bufferSize
-                : MaxMatchLength + codingPos;
+                : EncoderParameters.MaxMatchLength + codingPos;
 
-            LZSSUtils.GetLongestMatchStupid(history[..historyPos], buffer[codingPos..bufferViewEndIndex], out matchOffset, out matchLength);
+            LZSSUtils.GetMatch(history[..historyPos], buffer[codingPos..bufferViewEndIndex], EncoderParameters.SearchDepth, 
+                               out matchOffset, out matchLength);
 
-            if (matchLength <= BreakEvenPoint)
+            if (matchLength <= EncoderParameters.BreakEvenPoint)
             {
                 encodedText.AddRange(CreateType1Record(buffer[codingPos]));
 
-                if (historyPos + 1 > MaxHistoryLength)
+                if (historyPos + 1 > EncoderParameters.MaxHistoryLength)
                 {
                     //Console.WriteLine("ENCODER History is before delete1:");
                     //foreach (char b in history[..historyPos])
@@ -99,34 +92,40 @@ public static class LZSSEncoder
                 Array.Copy(buffer, codingPos, history, historyPos, 1);
                 historyPos++;
                 codingPos++;
+                //Console.WriteLine("History is (record1):");
+                //foreach (char b in history[..historyPos])
+                //{
+                //    Console.Write($"{b}");
+                //}
+                //Console.WriteLine();
             }
             else
             {
                 //Console.WriteLine($"History lenght (pos): {history[..historyPos].Length}, " +
-                //    $"match offset {matchOffset} length {matchLength}");
+                //  $"match offset {matchOffset} length {matchLength}");
                 //Console.WriteLine("Buffer VIEW is:");
                 //foreach (char b in buffer[codingPos..bufferViewEndIndex])
                 //{
-                //    Console.Write($"{b} ");
+                //    Console.Write($"{b}");
                 //}
                 //Console.WriteLine();
 
                 //Console.WriteLine("History is:");
                 //foreach (char b in history[..historyPos])
                 //{
-                //    Console.Write($"{b} ");
+                //    Console.Write($"{b}");
                 //}
                 //Console.WriteLine();
 
                 //Console.WriteLine("Match is:");
                 //foreach (char b in history[matchOffset..(matchOffset + matchLength)])
                 //{
-                //    Console.Write($"{b} ");
+                //    Console.Write($"{b}");
                 //}
                 //Console.WriteLine("\n");
 
                 encodedText.AddRange(CreateType2Record(matchOffset, matchLength));
-                if (historyPos + matchLength > MaxHistoryLength)
+                if (historyPos + matchLength > EncoderParameters.MaxHistoryLength)
                 {
                     //Console.WriteLine("ENCODER History is before delete2:");
                     //foreach (char b in history[..historyPos])
@@ -142,7 +141,7 @@ public static class LZSSEncoder
                 historyPos += matchLength;
             }
 
-            if (historyPos == MaxHistoryLength)
+            if (historyPos == EncoderParameters.MaxHistoryLength)
             {
                 //Console.WriteLine("ENCODER History is before delete3:");
                 //foreach (char b in history[..historyPos])
@@ -152,7 +151,6 @@ public static class LZSSEncoder
                 //Console.WriteLine();
                 Array.Clear(history);
                 historyPos = 0;
-
             }
         }
         return [.. encodedText];
@@ -183,8 +181,8 @@ public static class LZSSEncoder
     {
         // Record2 is x bits -> (0, offset, length) <1,MaxHistoryLenght,MaxMatchLength> in bits
         byte[] recordType = Utils.ToBase2(0, 1);
-        byte[] binaryOffset = Utils.ToBase2(offset, MaxHistoryLengthInBits);
-        byte[] binaryLenght = Utils.ToBase2(length, MaxMatchLenghtInBits);
+        byte[] binaryOffset = Utils.ToBase2(offset, EncoderParameters.MaxHistoryLengthInBits);
+        byte[] binaryLenght = Utils.ToBase2(length, EncoderParameters.MaxMatchLengthInBits);
         var record = recordType.Concat(binaryOffset).Concat(binaryLenght).ToArray();
         //Console.WriteLine($"Found offset {offset}, length {length}");
         //Console.WriteLine($"Record length {record.Length} record is:");
@@ -224,6 +222,20 @@ public static class LZSSEncoder
             .. metadata.MaxHistoryLength.EliasGammaCode(),
             .. metadata.MaxMatchLenght.EliasGammaCode(),
         ];
+    }
+
+    private static EncoderParameters CalculateParameters(int maxHistoryLength, int maxMatchLength, int searchDepth)
+    {
+        double record2Length = maxHistoryLength + maxMatchLength + 1;
+        return new EncoderParameters
+        {
+            MaxHistoryLengthInBits = maxHistoryLength,
+            MaxMatchLengthInBits = maxMatchLength,
+            MaxHistoryLength = (int)Math.Pow(2, maxHistoryLength) - 1,
+            MaxMatchLength = (int)Math.Pow(2, maxMatchLength) - 1,
+            BreakEvenPoint = (int)Math.Ceiling(record2Length / 9),
+            SearchDepth = searchDepth
+        };
     }
 
     private static LZSSMetadata GetMetadata(int maxHistoryLenght, int maxMatchLength)
