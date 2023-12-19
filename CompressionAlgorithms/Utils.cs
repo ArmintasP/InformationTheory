@@ -1,4 +1,6 @@
-﻿namespace CompressionAlgorithms;
+﻿using CompressionAlgorithms.BitStream;
+
+namespace CompressionAlgorithms;
 
 public static class Utils
 {
@@ -67,5 +69,21 @@ public static class Utils
         stream.ReadExactly(buffer, offset: 1, count: zerosCount);
 
         return buffer.ToInt32() - 1;
+    }
+
+    public static async Task OverwriteHeaderAsync(byte[] header, int bitsAddedToFormLastByteCount, BitWriter bitWriter)
+    {
+        var bitsAddedToFormLastByteInBinary = bitsAddedToFormLastByteCount.ToBase2(padding: 3);
+
+        // Only 3 bits are needed for `bitsAddedToFormLastByteInBinary`.
+        header[0] = bitsAddedToFormLastByteInBinary[0];
+        header[1] = bitsAddedToFormLastByteInBinary[1];
+        header[2] = bitsAddedToFormLastByteInBinary[2];
+
+        // Only first byte needs to be overwritten.
+        var firstHeaderByte = header[0..8];
+
+        bitWriter.SeekToBeginning();
+        await bitWriter.WriteAsync(firstHeaderByte);
     }
 }
