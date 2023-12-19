@@ -9,10 +9,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Folder Include="Resources\" />
-	</ItemGroup>
-
-	<ItemGroup>
 	  <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
 	</ItemGroup>
 
@@ -72,6 +68,9 @@
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
 	  <None Update="Resources\encoded.txt">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Resources\input\a.txt">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
 	  <None Update="Resources\text.txt">
