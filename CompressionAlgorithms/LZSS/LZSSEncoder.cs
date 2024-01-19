@@ -35,7 +35,7 @@ public static class LZSSEncoder
         int readBytesCount;
 
         while ((readBytesCount = await fileReader.ReadAtLeastAsync(inputStreamChunck, InputStreamChunckSize, throwOnEndOfStream: false)) > 0)
-        { 
+        {
             var text = inputStreamChunck[..readBytesCount];
 
             var encodedText = Compress(history, ref historyPos, text);
@@ -65,7 +65,7 @@ public static class LZSSEncoder
                 ? bufferSize
                 : EncoderParameters.MaxMatchLength + codingPos;
 
-            LZSSUtils.GetMatch(history[..historyPos], buffer[codingPos..bufferViewEndIndex], EncoderParameters.SearchDepth, 
+            LZSSUtils.GetMatch(history[..historyPos], buffer[codingPos..bufferViewEndIndex], EncoderParameters.SearchDepth,
                                out int matchOffset, out int matchLength);
 
             if (matchLength <= EncoderParameters.BreakEvenPoint)
@@ -74,9 +74,10 @@ public static class LZSSEncoder
 
                 if (historyPos + 1 > EncoderParameters.MaxHistoryLength)
                 {
-                    Array.Clear(history);
-                    historyPos = 0;
+                    Array.Copy(history, 1, history, 0, EncoderParameters.MaxHistoryLength - 1);
+                    historyPos--;
                 }
+                
                 Array.Copy(buffer, codingPos, history, historyPos, 1);
                 historyPos++;
                 codingPos++;
@@ -87,18 +88,14 @@ public static class LZSSEncoder
 
                 if (historyPos + matchLength > EncoderParameters.MaxHistoryLength)
                 {
-                    Array.Clear(history);
-                    historyPos = 0;
+                    var missingSpace = historyPos + matchLength - EncoderParameters.MaxHistoryLength;
+                    Array.Copy(history, missingSpace, history, 0, EncoderParameters.MaxHistoryLength - missingSpace);
+                    historyPos -= missingSpace;
                 }
+                
                 Array.Copy(buffer, codingPos, history, historyPos, matchLength);
                 codingPos += matchLength;
                 historyPos += matchLength;
-            }
-
-            if (historyPos == EncoderParameters.MaxHistoryLength)
-            {
-                Array.Clear(history);
-                historyPos = 0;
             }
         }
         return [.. encodedText];

@@ -73,9 +73,10 @@ internal class LZSSDecoder
 
                 if (historyPos + WordLength > MaxHistoryLength)
                 {
-                    Array.Clear(history);
-                    historyPos = 0;
+                    Array.Copy(history, WordLength, history, 0, MaxHistoryLength - WordLength);
+                    historyPos -= WordLength;
                 }
+                
                 Array.Copy(buffer, decodingPos, history, historyPos, WordLength);
                 decodingPos += WordLength;
                 historyPos += WordLength;
@@ -106,18 +107,16 @@ internal class LZSSDecoder
                 
                 if (historyPos + (matchLength * WordLength) > MaxHistoryLength)
                 {
-                    Array.Clear(history);
-                    historyPos = 0;
+                    var missingSpace = historyPos + (matchLength * WordLength) - MaxHistoryLength;
+                    Array.Copy(history, missingSpace, history, 0, MaxHistoryLength - missingSpace);
+                    historyPos -= missingSpace;
                 }
+                
                 Array.Copy(decodedWord, 0, history, historyPos, decodedWord.Length);
                 historyPos += WordLength * matchLength;
             }
         }
-        if(historyPos == MaxHistoryLength)
-        {
-            Array.Clear(history);
-            historyPos = 0;
-        }
+
         return decodedText;
     }
 
